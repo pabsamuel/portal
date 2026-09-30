@@ -6,7 +6,7 @@ export const CONFIG = {
   PUBLIC_BASE: 'https://pabsamuel.github.io/portal/',
 
   APP_NAME: 'Farwindow Portal',   // working title — see docs/BRAND_AND_NAMING.md
-  VERSION: '0.1.0',
+  VERSION: '0.3.0',
 
   // Phone pairing (PeerJS free cloud signaling → direct WebRTC data channel)
   PEER_PREFIX: 'fwportal-',

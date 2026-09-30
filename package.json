@@ -1,6 +1,6 @@
 {
   "name": "farwindow-portal",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Gesture-driven portal for TVs/projectors: draw a circle in the air, a sparking portal opens onto live cams worldwide.",
   "type": "module",

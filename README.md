@@ -4,7 +4,7 @@ Havada elinle ya da telefonunla **bir daire çiz**. TV’de veya projektörde k�
 ve içinden dünyanın bir yerindeki **canlı kamera** görünür: Tokyo’da Shibuya, İstanbul’da Haliç,
 Uzay İstasyonu, Namib Çölü’nde bir su kaynağı, Laponya’da kuzey ışıkları…
 
-**Durum:** v0.2.0 prototip · canlı: https://pabsamuel.github.io/portal/ · **Proje ilerlemesi: %27** → ayrıntı [PROGRESS.md](PROGRESS.md)
+**Durum:** v0.3.0 prototip · canlı: https://pabsamuel.github.io/portal/ · **Proje ilerlemesi: %27** → ayrıntı [PROGRESS.md](PROGRESS.md)
 
 ---
 
@@ -28,6 +28,8 @@ Uzay İstasyonu, Namib Çölü’nde bir su kaynağı, Laponya’da kuzey ışı
 | `?offline=1` | İnternet olmadan çevrimdışı “Kozmik Boşluk” portalı |
 | `?fakehand=1&auto=hand` | Sahte el senaryosu oynar (daire → kaydırma → ✌️ → ✊) — kamera olmadan demo |
 | `?auto=mouse` / `?auto=hand` | Başlangıç ekranını atlar |
+| `?rec=1` | Çekim modu: arayüz gizli, yer adı büyük (tanıtım videosu çekmek için; **R** tuşuyla da açılır/kapanır) |
+| `?obs=1&code=KOD` | OBS / yayıncı modu: şeffaf arka plan, telefon kodu sabit → [docs/OBS.md](docs/OBS.md) |
 | `sources.html` | Bütün canlı kameraları test eder, çalışanları listeler |
 
 ## Kontroller
@@ -42,6 +44,9 @@ Uzay İstasyonu, Namib Çölü’nde bir su kaynağı, Laponya’da kuzey ışı
 | 🙌 İki açık eli aç/kapat · fare tekerleği · +/- | Portalı büyüt/küçült |
 | 🤟 · **T** | Tema: Kıvılcım / Aurora / Plazma / Buz |
 | **Esc** · sağ tık | Kapat |
+| **1–9** | Belirli bir yere git (önce kendi videoların, sonra öne çıkan yerler) |
+| **R** çekim modu · **D** teknik bilgi | Arayüzü gizle / fps, sıradaki kamera, telefon durumu |
+| 🎬 Video dosyasını ekrana sürükle-bırak · Ayarlar → Kendi videoların | Kendi videon portalda oynar (bu tarayıcıda saklanır, hiçbir yere yüklenmez) |
 | **F** tam ekran · **H** yardım · **O** ayarlar · **P** telefon · **C** kamera · **S** efekt sesi | |
 
 ## Klasör yapısı
@@ -57,6 +62,9 @@ portal/
 │   ├── portal-fx.js      kıvılcım portal efektleri (Canvas 2D)
 │   ├── portal-view.js    dairesel video penceresi + çevrimdışı sahne
 │   ├── youtube.js        canlı yayın oynatıcı (IFrame API)
+│   ├── deck.js           iki oynatıcı: görünen + arka planda hazırlanan sıradaki
+│   ├── video-player.js   kendi videoların (dosya / .mp4 linki)
+│   ├── media-store.js    kendi video dosyaların (IndexedDB, cihazda kalır)
 │   ├── hand-input.js     el takibi (MediaPipe, tarayıcıda)
 │   ├── wand-link.js      telefon eşleştirme (PeerJS/WebRTC) — ekran tarafı
 │   ├── wand.js           telefon tarafı (jiroskop → imleç)

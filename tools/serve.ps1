@@ -9,7 +9,7 @@ Write-Host "  Portal calisiyor -> http://localhost:$Port/"
 Write-Host "  Kapatmak icin bu pencereyi kapat."
 Write-Host ""
 Start-Process "http://localhost:$Port/"
-$mime = @{ '.html'='text/html; charset=utf-8'; '.js'='text/javascript; charset=utf-8'; '.mjs'='text/javascript; charset=utf-8'; '.css'='text/css; charset=utf-8'; '.json'='application/json'; '.webmanifest'='application/manifest+json'; '.svg'='image/svg+xml'; '.png'='image/png'; '.ico'='image/x-icon'; '.wasm'='application/wasm'; '.md'='text/plain; charset=utf-8'; '.mp4'='video/mp4' }
+$mime = @{ '.html'='text/html; charset=utf-8'; '.js'='text/javascript; charset=utf-8'; '.mjs'='text/javascript; charset=utf-8'; '.css'='text/css; charset=utf-8'; '.json'='application/json'; '.webmanifest'='application/manifest+json'; '.svg'='image/svg+xml'; '.png'='image/png'; '.ico'='image/x-icon'; '.wasm'='application/wasm'; '.md'='text/plain; charset=utf-8'; '.mp4'='video/mp4'; '.webm'='video/webm'; '.m4v'='video/mp4'; '.mov'='video/quicktime' }
 while ($listener.IsListening) {
   $ctx = $listener.GetContext()
   try {

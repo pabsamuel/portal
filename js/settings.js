@@ -6,13 +6,14 @@ export const ALL_CATS = ['turkiye', 'city', 'nature', 'animals', 'water', 'sky',
 export const DEFAULT_SETTINGS = {
   lang: (typeof navigator !== 'undefined' && !(navigator.language || 'tr').toLowerCase().startsWith('tr')) ? 'en' : 'tr',
   theme: 'ember',        // ember | aurora | plasma | frost
-  size: 'gesture',       // gesture | large | huge
+  size: 'gesture',       // gesture | large | huge | full
   cats: [...ALL_CATS],
   sfx: true,
   preview: true,         // small camera preview with hand skeleton
   sens: 1.0,             // hand-tracking reach (higher = smaller hand motion covers the screen)
   compliant: false,      // store-release mode: unmodified rectangular player, no effects over it
   ambient: true,         // blurred copy of the live view fills the screen around the portal
+  onlyMine: false,       // tour only the user's own videos / added streams (when there are any)
 };
 
 export const store = {

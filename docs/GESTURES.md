@@ -4,7 +4,7 @@
 screen units (1 unit = min(screenW, screenH) px, t in seconds). The same recognizers run for all inputs, so behaviour is
 identical and unit-testable (`npm test`, 20 tests).
 
-## Gesture set (v0.1.0)
+## Gesture set (v0.3.0)
 | Gesture | Input | Action | Method |
 |---|---|---|---|
 | ◯ Circle (either direction) | hand / wand / mouse | Open portal at the circle; if open → jump to a random place | Angle accumulation (below) |
@@ -19,6 +19,9 @@ identical and unit-testable (`npm test`, 20 tests).
 | 📱 Shake | wand | Random place | ≥3 accel peaks > 16 m/s² within 0.8 s |
 | Fist = pen up | hand | Stops tracing (no accidental circles while closing) | — |
 | Hold the pad = pen down | wand | Only traces while held (free mode optional) | — |
+
+Keyboard extras (v0.3.0): **1–9** jump to a fixed destination (own videos → added streams → featured places),
+**R** recording mode (UI hidden), **D** debug overlay. Dragging a video file onto the screen plays it in the portal.
 
 ## Circle detector (angle accumulation)
 For each new point, look back over the last `tMax` seconds and try windows (longest first):

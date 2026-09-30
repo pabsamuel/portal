@@ -27,6 +27,11 @@ Doldur, sonra `prompts/01_device_test_fixes.md` ile Claude’a ver.
 | A15 | İmleç telefonun yönüyle aynı tarafa gidiyor (ters ise: Ayarlar → Sağ-sol ters) | |
 | A16 | sources.html → “Hepsini test et” → ✅ __ çalışıyor / ❌ __ çalışmıyor | |
 | A17 | Portal açıkken akıcılık (takılma var mı?) | |
+| A18 | Telefondan çektiğin bir videoyu (MP4) ekrana sürükle-bırak → portalda oynadı, rozet “VİDEO” | |
+| A19 | Sayfayı yenile → video Ayarlar → Kendi videoların listesinde duruyor | |
+| A20 | **R** → arayüz gizlendi, **1–9** ile istediğin yer açıldı, tekrar **R** → geri geldi | |
+| A21 | **D** → teknik bilgi kutusu (fps kaç?) | __ fps |
+| A22 | (OBS varsa) docs/OBS.md kontrol listesi | |
 
 ## B) Teknik Kapı (4 kişi × 20 deneme × 2 mod)
 | Kişi | Mesafe | Işık | Kamera: başarılı/20 | Telefon: başarılı/20 | Yanlış açılma (10 dk boşta) |

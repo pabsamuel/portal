@@ -194,6 +194,7 @@ export const OFFLINE_CAM = {
 export function sourcesOf(entry) {
   const out = (entry.yt || []).map((id) => ({ type: 'yt', id, key: 'yt:' + id }));
   if (entry.ch) out.push({ type: 'ch', id: entry.ch, key: 'ch:' + entry.ch });
+  if (entry.video) out.push({ type: 'video', url: entry.video, key: 'video:' + entry.key }); // user's own video
   return out;
 }
 

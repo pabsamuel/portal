@@ -201,6 +201,93 @@ try {
     check('no JS errors (small screen)', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // 8) Own videos: file (IndexedDB, survives reload), drag & drop, direct link; plays even with YouTube offline
+  {
+    const { page, errors } = await newPage('index.html?offline=1&auto=mouse');
+    const addFile = (name) => page.evaluate(async (n) => {
+      const b = await (await fetch('tests/fixtures/sample.webm')).blob();
+      return (await window.__portal.api.addFiles([new File([b], n, { type: 'video/webm' })])).map((e) => e.key);
+    }, name);
+    const keys = await addFile('kapadokya_balon.webm');
+    await sleep(2600);
+    let s = await state(page);
+    check('own video file opens in the portal', s.open === true && s.status === 'own' && s.entry === keys[0], JSON.stringify(s));
+    const playing = await page.evaluate(() => [...document.querySelectorAll('video.own-video')].some((v) => !v.paused && v.currentTime > 0.1));
+    check('own video is actually playing', playing);
+    await page.screenshot({ path: join(OUT, '17-own-video.png') });
+    // drag & drop a second file onto the screen
+    await page.evaluate(async () => {
+      const b = await (await fetch('tests/fixtures/sample.webm')).blob(), dt = new DataTransfer();
+      dt.items.add(new File([b], 'drop test.webm', { type: 'video/webm' }));
+      dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt, cancelable: true }));
+      window.__dropShown = !document.querySelector('#dropOverlay').classList.contains('hidden');
+      dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true }));
+    });
+    await sleep(2200);
+    const dropShown = await page.evaluate(() => window.__dropShown);
+    const own = await page.evaluate(() => window.__portal.api.own());
+    s = await state(page);
+    check('drag & drop shows the overlay and adds the video', dropShown && own.length === 2 && s.status === 'own' && s.entry === own[0], `${dropShown} ${JSON.stringify(own)} ${JSON.stringify(s)}`);
+    // direct link
+    const linkKey = await page.evaluate(() => { const e = window.__portal.api.addVideoUrl(location.origin + '/tests/fixtures/sample.webm', 'Link test'); return e && e.key; });
+    await sleep(2200);
+    s = await state(page);
+    check('direct video link plays in the portal', s.status === 'own' && s.entry === linkKey, JSON.stringify(s));
+    await page.keyboard.press('o'); await sleep(250);
+    await page.screenshot({ path: join(OUT, '18-settings-own.png') });
+    await page.keyboard.press('Escape');
+    // persistence: reload → the two files come back from IndexedDB, the link from localStorage
+    await page.reload({ waitUntil: 'load' }); await sleep(900);
+    const after = await page.evaluate(() => window.__portal.api.own());
+    check('own videos survive a reload', after.length === 3, JSON.stringify(after));
+    await page.evaluate(() => window.__portal.api.removeVideo(window.__portal.api.own()[0]));
+    await sleep(300);
+    const left = await page.evaluate(() => window.__portal.api.own().length);
+    check('removing an own video works', left === 2, String(left));
+    // with YouTube offline, hops cycle through own videos instead of the offline scene
+    await page.evaluate(() => window.__portal.api.open()); await sleep(2600);
+    s = await state(page);
+    check('offline mode still plays own videos', s.status === 'own', JSON.stringify(s));
+    check('no JS errors (own videos)', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // 9) Recording mode (R), debug overlay (D), number keys
+  {
+    const { page, errors } = await newPage('index.html?offline=1&auto=mouse');
+    await page.keyboard.press('d'); await sleep(700);
+    const dbg = await page.evaluate(() => { const el = document.querySelector('#debug'); return !el.classList.contains('hidden') && el.textContent; });
+    check('D shows the debug overlay', !!dbg && /fps \d+/.test(dbg) && /standby/.test(dbg), String(dbg).split('\n')[0]);
+    await page.keyboard.press('d');
+    await page.keyboard.press('2'); await sleep(1600);
+    let s = await state(page);
+    check('number key opens a portal to a chosen place', s.open === true, JSON.stringify(s));
+    await page.keyboard.press('r'); await sleep(300);
+    const hudHidden = !(await page.isVisible('#hud')), label = await page.isVisible('#label');
+    check('R hides the UI for recording but keeps the place name', hudHidden && label, `hud hidden ${hudHidden}, label ${label}`);
+    await page.screenshot({ path: join(OUT, '19-rec-mode.png') });
+    await page.keyboard.press('r'); await sleep(200);
+    check('R again brings the UI back', await page.isVisible('#hud'));
+    check('no JS errors (rec/debug)', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // 10) OBS overlay: transparent page, no start screen, fixed phone code
+  {
+    const { page, errors } = await newPage('index.html?obs=1&offline=1&code=obs42', 1280, 720);
+    await sleep(600);
+    const info = await page.evaluate(() => ({
+      started: window.__portal.started, startHidden: document.querySelector('#start').offsetParent === null,
+      bg: getComputedStyle(document.body).backgroundColor, code: window.__portal.api.wandCode(),
+    }));
+    check('OBS mode starts without the start screen on a transparent page', info.started && info.startHidden && /rgba\(0, 0, 0, 0\)|transparent/.test(info.bg), JSON.stringify(info));
+    check('OBS mode keeps the phone code from ?code=', info.code === 'OBS42', String(info.code));
+    await page.evaluate(() => window.__portal.api.open()); await sleep(2400);
+    await page.screenshot({ path: join(OUT, '20-obs-overlay.png'), omitBackground: true });
+    const corner = await page.evaluate(() => getComputedStyle(document.querySelector('#ambient')).display);
+    check('OBS mode has no ambient fill around the portal', corner === 'none', corner);
+    check('no JS errors (OBS mode)', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
 } finally {
   await browser.close();
   server.kill();

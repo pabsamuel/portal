@@ -11,17 +11,24 @@ import { t, tx } from './i18n.js';
 import { UI } from './ui.js';
 import { WandLink } from './wand-link.js';
 import { HandInput } from './hand-input.js';
+import { listVideos, saveVideo, deleteVideo } from './media-store.js';
 
 const qs = new URLSearchParams(location.search);
 const FORCE_OFFLINE = qs.has('offline');
 const FAKE_HAND = qs.has('fakehand');
+// ?obs=1 → streamer overlay: transparent page, no UI, no ambient fill, phone wand as the controller.
+// ?rec=1 (or R) → recording mode: UI hidden, bigger place names, for screen-recorded clips.
+const OBS = qs.has('obs');
+const WAND_CODE = (qs.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || null;
+if (OBS) { document.body.classList.add('obs'); document.documentElement.classList.add('obs'); }
+if (OBS || qs.has('rec')) document.body.classList.add('rec');
 const $ = (s) => document.querySelector(s);
 const now = () => performance.now() / 1000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const fx = new FX($('#fx'), settings.theme);
 const view = new PortalView({ root: $('#portalView'), wrap: $('#ytWrap'), host: $('#ytHosts'), offline: $('#offlineScene'), ambient: $('#ambient') });
-view.ambientOn = settings.ambient;
+view.ambientOn = settings.ambient && !OBS; // in OBS the area around the portal must stay transparent
 const sfx = new Sfx(); sfx.setEnabled(settings.sfx);
 
 const app = {
@@ -47,15 +54,28 @@ function markDead(key, code) {
   console.info(`[portal] source failed (${code}) → skipped for ${soft ? '1 h' : '6 h'}:`, key);
 }
 let userCams = store.get('fw.userCams', []);
+// The user's own videos (Tier A content: owned footage may be framed and overlaid freely).
+// Local files live in IndexedDB (never uploaded); direct MP4/WebM links live in localStorage.
+let ownVideos = [];
+let urlVideos = store.get('fw.userVideos', []); // [{id, url, name}]
+const ownEntry = (id, url, name, local) => ({
+  key: 'own-' + id, id, own: true, user: true, local, video: url, yt: [], ch: null,
+  name: { tr: name || 'Benim videom', en: name || 'My video' }, place: { tr: 'Senin videon', en: 'Your video' },
+  flag: '🎬', tz: null, cat: 'own',
+});
 
 const alive = (e) => sourcesOf(e).some((s) => !isDead(s.key));
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 function buildList() {
   const ok = (e) => e.user || settings.cats.includes(e.cat);
-  const users = userCams.filter(ok), featured = CAMS.slice(0, FEATURED_COUNT).filter(ok), rest = CAMS.slice(FEATURED_COUNT).filter(ok);
-  app.list = [...users, ...shuffle(featured), ...shuffle(rest)]; // user cams first, then a fresh random tour
+  const users = [...ownVideos, ...userCams];
+  if (settings.onlyMine && users.length) { app.list = users; app.pos = -1; return; } // "only my videos/cams" tour
+  const featured = CAMS.slice(0, FEATURED_COUNT).filter(ok), rest = CAMS.slice(FEATURED_COUNT).filter(ok);
+  app.list = [...users, ...shuffle(featured), ...shuffle(rest)]; // user's own first, then a fresh random tour
   app.pos = -1;
 }
+/** List changed (videos/cams added or removed, filters) → drop the pre-warmed pick and warm a new one. */
+function rebuild() { buildList(); if (app.started && !FORCE_OFFLINE) { deck.cancelStandby(); deck.prepare(200); } }
 /** Next destination in the tour that still has a working source (dead ones are skipped silently). */
 function nextEntry() {
   const n = app.list.length;
@@ -77,7 +97,11 @@ async function showEntry(entry = null) {
   const my = ++app.loadToken;
   app.portal.status = null;
   fx.setLoading(true); ui.hideLabel(); sendState();
-  if (FORCE_OFFLINE || app.ytDown || (entry && entry.offline)) {
+  // No YouTube (offline flag / API unreachable): the user's own videos still play; otherwise the offline scene.
+  if ((FORCE_OFFLINE || app.ytDown) && !(entry && (entry.own || entry.offline)) && ownVideos.length) {
+    app.ownPos = ((app.ownPos ?? -1) + 1) % ownVideos.length; entry = ownVideos[app.ownPos];
+  }
+  if (((FORCE_OFFLINE || app.ytDown) && !(entry && entry.own)) || (entry && entry.offline)) {
     deck.stopActive(); view.showOffline(true);
     await sleep(450);
     if (my === app.loadToken) finishLoad(OFFLINE_CAM, 'offline');
@@ -88,7 +112,8 @@ async function showEntry(entry = null) {
     const r = await deck.present(entry);
     if (my !== app.loadToken) return;
     pushHistory(r.entry);
-    finishLoad(r.entry, r.live === false ? 'recorded' : 'live');
+    if (entry && entry.own && r.entry !== entry) ui.toast(t('videoBad'), 4000); // the chosen video can't play here
+    finishLoad(r.entry, r.own ? 'own' : r.live === false ? 'recorded' : 'live');
   } catch (err) {
     if (my !== app.loadToken || (err && err.code === 'cancel')) return;
     if (err instanceof Error) { app.ytDown = true; ui.toast(t('ytFail'), 4000); } // YouTube API unreachable
@@ -104,7 +129,7 @@ function finishLoad(entry, status) {
 }
 
 // ---------------------------------------------------------------- portal actions
-function openPortalAt(cx, cy, r, dir = 1, a0 = -Math.PI / 2, pick = 'next') {
+function openPortalAt(cx, cy, r, dir = 1, a0 = -Math.PI / 2, entry = null) {
   const { W, H, minDim } = app;
   const from = { cx, cy, r }; // the circle as drawn — the portal ignites exactly there
   let R;
@@ -118,16 +143,18 @@ function openPortalAt(cx, cy, r, dir = 1, a0 = -Math.PI / 2, pick = 'next') {
   fx.openPortal(cx, cy, R, dir, a0, from);
   sfx.open(); buzz(60); placeLabel();
   app.events.push({ t: now(), e: 'open' }); window.__openedAt = performance.now();
-  showEntry(null);
+  showEntry(entry && typeof entry === 'object' ? entry : null);
 }
 
-function hop(step = 1, random = false) {
-  if (!app.portal.open) { openPortalAt(app.W / 2, app.H / 2, 0.4 * app.minDim, 1, -Math.PI / 2, random ? 'random' : 'next'); return; }
+function hop(step = 1, random = false, entry = null) {
+  if (!app.portal.open) { openPortalAt(app.W / 2, app.H / 2, 0.4 * app.minDim, 1, -Math.PI / 2, entry); return; }
   if (fx.portal.state === 'closing') return;
   fx.hop(); sfx.hop(); buzz(30);
   app.events.push({ t: now(), e: 'hop', step, random });
-  showEntry(step < 0 && !random ? prevEntry() : null);
+  showEntry(entry || (step < 0 && !random ? prevEntry() : null));
 }
+/** Jump straight to a specific destination (own video just added, number keys in recording mode). */
+function goTo(entry) { if (entry) hop(0, false, entry); }
 
 function closePortal() {
   if (!app.portal.open) return;
@@ -251,11 +278,40 @@ addEventListener('keydown', (e) => {
     case 'p': case 'P': ensureWand(); ui.togglePanel('Phone'); break;
     case 'o': case 'O': ui.togglePanel('Settings'); break;
     case 'h': case 'H': case '?': ui.togglePanel('Help'); break;
+    case 'r': case 'R': toggleRec(); break;
+    case 'd': case 'D': toggleDebug(); break;
     case '+': case '=': setPortalRadius(app.portal.R * 1.08); break;
     case '-': setPortalRadius(app.portal.R / 1.08); break;
-    default: break;
+    default:
+      if (/^[1-9]$/.test(e.key)) jumpTo(+e.key); // recording: pick the exact scene
+      break;
   }
 });
+
+/** 1–9: your own videos / added streams first, then the featured places (fixed order). */
+function jumpPool() { return [...ownVideos, ...userCams, ...CAMS.slice(0, FEATURED_COUNT)]; }
+function jumpTo(n) { const e = jumpPool()[n - 1]; if (e) goTo(e); }
+function toggleRec() { const on = document.body.classList.toggle('rec'); app.events.push({ t: now(), e: on ? 'rec-on' : 'rec-off' }); if (!on) ui.toast(t('recOff')); }
+
+// ---- debug overlay (D): what the app is doing right now — for device tests and bug reports
+const dbgEl = $('#debug');
+function toggleDebug() { dbgEl.classList.toggle('hidden'); }
+function renderDebug() {
+  if (dbgEl.classList.contains('hidden')) return;
+  const p = app.portal, fp = fx.portal, sb = deck.standby;
+  const deadN = Object.keys(dead).filter(isDead).length;
+  const inputs = [...app.inputs.entries()].map(([id, i]) => `${id}${i.wasDrawing ? '✎' : ''}`).join(' ') || '—';
+  dbgEl.textContent = [
+    `fps ${app.fps}  particles ${fx.n}  dpr ${fx.dpr}`,
+    `portal ${fp.state}${p.full ? ' FULL' : ''}  R ${Math.round(p.R)}  status ${p.status || '—'}`,
+    `entry ${p.entry ? p.entry.key : '—'}`,
+    `standby ${sb ? `${sb.status} ${sb.entry ? sb.entry.key : ''}` : '—'}  slot ${deck.active}`,
+    `list ${app.list.length}  pos ${app.pos}  dead ${deadN}  own ${ownVideos.length}`,
+    `hand ${app.hand && app.hand.running ? Math.round(app.hand.fps) + ' fps' : 'off'}  wand ${app.wandStatus.state}${app.wand && app.wand.code ? ' ' + app.wand.code : ''} (${app.wands.size})`,
+    `inputs ${inputs}`,
+    `tab ${document.visibilityState}  ${app.W}×${app.H}  ${OBS ? 'OBS ' : ''}${document.body.classList.contains('rec') ? 'REC' : ''}`,
+  ].join('\n');
+}
 
 // ---- hand (webcam)
 async function toggleHand(force) {
@@ -340,7 +396,7 @@ function twoHandResize(hands) {
 // ---- phone wand
 function ensureWand() {
   if (app.wand) return;
-  app.wand = new WandLink({ onMotion: onWandMotion, onEvent: onWandEvent, onStatus: onWandStatus });
+  app.wand = new WandLink({ onMotion: onWandMotion, onEvent: onWandEvent, onStatus: onWandStatus, fixedCode: WAND_CODE });
   app.wand.start();
 }
 function getWand(id) {
@@ -393,6 +449,95 @@ function sendState() {
 }
 function buzz(ms) { if (app.wand) app.wand.broadcast({ t: 'buzz', ms }); }
 
+// ---------------------------------------------------------------- own videos (files / direct links)
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv)$/i;
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const baseName = (n) => String(n || '').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 60);
+
+function refreshOwn() { ui.setOwnVideos(ownVideos); ui.setUserCams(userCams); ui.renderSettings(); rebuild(); }
+
+async function loadOwnVideos() {
+  const recs = (await listVideos()).filter((r) => r && r.blob).sort((a, b) => (b.added || 0) - (a.added || 0));
+  const local = recs.map((r) => ownEntry(r.id, URL.createObjectURL(r.blob), r.name, true));
+  const links = urlVideos.map((v) => ownEntry(v.id, v.url, v.name, false));
+  ownVideos = [...local, ...links];
+  if (ownVideos.length) refreshOwn();
+}
+
+/** Files from the picker or drag & drop → stored in this browser → shown in the portal right away. */
+async function addFiles(files) {
+  const vids = [...(files || [])].filter((f) => (f.type || '').startsWith('video/') || VIDEO_EXT.test(f.name || ''));
+  if (!vids.length) { ui.toast(t('videoNone'), 3500); return []; }
+  const added = []; let stored = true;
+  // ask the browser not to evict our storage under disk pressure (silent in Chrome; may prompt in Firefox)
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch { /* ignore */ }
+  for (const f of vids) {
+    const id = newId(), name = baseName(f.name);
+    try { await saveVideo({ id, name, type: f.type, size: f.size, added: Date.now(), blob: f }); }
+    catch (err) { stored = false; console.warn('[own video] kept for this session only:', err); }
+    added.push(ownEntry(id, URL.createObjectURL(f), name, true));
+  }
+  ownVideos = [...added, ...ownVideos];
+  refreshOwn();
+  ui.toast(stored ? `${t('videoAdded')} ✓ ${added.length > 1 ? '(' + added.length + ')' : ''}` : t('storageFull'), 4000);
+  showNow(added[0]);
+  return added;
+}
+
+function addVideoUrl(url, name) {
+  const u = String(url || '').trim();
+  if (parseYouTubeId(u)) return addYouTube(u, name);          // a YouTube link → it's a stream, not a file
+  if (!/^https?:\/\/\S+$/i.test(u)) { ui.toast(t('videoBadUrl'), 3500); return null; }
+  const id = newId(), nm = name || baseName(decodeURIComponent(u.split(/[?#]/)[0].split('/').pop() || '')) || '';
+  urlVideos = [{ id, url: u, name: nm }, ...urlVideos]; store.set('fw.userVideos', urlVideos);
+  const e = ownEntry(id, u, nm, false);
+  ownVideos = [e, ...ownVideos];
+  refreshOwn(); ui.toast(t('videoAdded') + ' ✓');
+  showNow(e);
+  return e;
+}
+
+function addYouTube(url, name) {
+  const id = parseYouTubeId(url);
+  if (!id) { ui.toast(t('badUrl')); return null; }
+  let tz = 'UTC'; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { /* ignore */ }
+  const e = { key: 'user-' + id, user: true, yt: [id], ch: null, name: { tr: name || 'Benim kameram', en: name || 'My camera' }, place: { tr: 'Senin eklediğin yayın', en: 'Added by you' }, flag: '📍', tz, cat: 'user' };
+  userCams = [e, ...userCams.filter((c) => c.key !== e.key)];
+  store.set('fw.userCams', userCams); delete dead['yt:' + id]; store.set('fw.dead', dead);
+  refreshOwn(); ui.toast(t('added') + ' ✓');
+  return e;
+}
+
+async function removeVideo(key) {
+  const e = ownVideos.find((v) => v.key === key); if (!e) return;
+  ownVideos = ownVideos.filter((v) => v !== e);
+  if (e.local) await deleteVideo(e.id);
+  else { urlVideos = urlVideos.filter((v) => v.id !== e.id); store.set('fw.userVideos', urlVideos); }
+  delete dead['video:' + key]; store.set('fw.dead', dead);
+  refreshOwn();
+  if (app.portal.open && app.portal.entry === e) hop(1);
+  if (e.local) setTimeout(() => URL.revokeObjectURL(e.video), 3000); // after the player let go of it
+}
+
+/** Show a destination now: jump if a portal is open, otherwise open one (starting the app if needed). */
+function showNow(e) {
+  if (!e) return;
+  if (!app.started) start('mouse');
+  goTo(e);
+}
+
+// drag & drop anywhere on the big screen
+{
+  const dropEl = $('#dropOverlay');
+  let depth = 0;
+  const hasFiles = (e) => !!(e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files'));
+  addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; dropEl.classList.remove('hidden'); });
+  addEventListener('dragover', (e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) dropEl.classList.add('hidden'); });
+  addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; dropEl.classList.add('hidden'); addFiles(e.dataTransfer.files); });
+  $('#ownFile').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) addFiles(f); });
+}
+
 // ---------------------------------------------------------------- UI wiring
 const ui = new UI({
   action(act, data) {
@@ -410,21 +555,16 @@ const ui = new UI({
       case 'set': {
         const v = data.val; settings[data.key] = v; saveSettings(); settingChanged(data.key); ui.renderSettings(); break;
       }
-      case 'add-cam': {
-        const url = $('#ucUrl').value, name = $('#ucName').value.trim(), id = parseYouTubeId(url);
-        if (!id) { ui.toast(t('badUrl')); break; }
-        let tz = 'UTC'; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { /* ignore */ }
-        userCams = [{ key: 'user-' + id, user: true, yt: [id], ch: null, name: { tr: name || 'Benim kameram', en: name || 'My camera' }, place: { tr: 'Senin eklediğin yayın', en: 'Added by you' }, flag: '📍', tz, cat: 'user' }, ...userCams.filter((c) => c.key !== 'user-' + id)];
-        store.set('fw.userCams', userCams); delete dead['yt:' + id]; store.set('fw.dead', dead);
-        ui.setUserCams(userCams); ui.renderSettings(); buildList(); app.pos = -1; ui.toast(t('added') + ' ✓');
-        break;
-      }
+      case 'add-cam': addYouTube($('#ucUrl').value, $('#ucName').value.trim()); break;
       case 'remove-cam':
-        userCams = userCams.filter((c) => c.key !== data.key); store.set('fw.userCams', userCams);
-        ui.setUserCams(userCams); ui.renderSettings(); buildList(); break;
+        userCams = userCams.filter((c) => c.key !== data.key); store.set('fw.userCams', userCams); refreshOwn(); break;
+      case 'pick-video': $('#ownFile').click(); break;
+      case 'add-video-url': addVideoUrl($('#ovUrl').value, $('#ovName').value.trim()); break;
+      case 'remove-video': removeVideo(data.key); break;
+      case 'play-own': { const e = [...ownVideos, ...userCams].find((v) => v.key === data.key); if (e) { ui.closePanels(); showNow(e); } break; }
       case 'clear-dead':
         for (const k of Object.keys(dead)) delete dead[k];
-        store.set('fw.dead', dead); app.ytDown = false; buildList(); deck.cancelStandby(); deck.prepare(200); ui.toast(t('cleared') + ' ✓'); break;
+        store.set('fw.dead', dead); app.ytDown = false; rebuild(); ui.toast(t('cleared') + ' ✓'); break;
       default: break;
     }
   },
@@ -440,8 +580,8 @@ function settingChanged(key) {
     case 'preview':
       if (app.hand) app.hand.previewOn = settings.preview;
       $('#camPreview').classList.toggle('hidden', !(settings.preview && app.hand && app.hand.running && !FAKE_HAND)); break;
-    case 'cats': buildList(); deck.cancelStandby(); deck.prepare(200); break;
-    case 'ambient': view.ambientOn = settings.ambient; break;
+    case 'cats': case 'onlyMine': rebuild(); break;
+    case 'ambient': view.ambientOn = settings.ambient && !OBS; break;
     case 'size':
       if (!app.portal.open) break;
       if (settings.size === 'full') { setFull(true); break; }
@@ -477,7 +617,8 @@ addEventListener('resize', () => {
 });
 
 // ---------------------------------------------------------------- frame loop
-let last = performance.now(), secT = 0;
+let last = performance.now(), secT = last / 1000, dbgT = 0, frames = 0;
+app.fps = 0;
 function frame(nowMs) {
   const dt = Math.min(0.05, Math.max(0, (nowMs - last) / 1000)); last = nowMs;
   const tSec = nowMs / 1000;
@@ -506,7 +647,10 @@ function frame(nowMs) {
     ui.hint(app.hand && app.hand.running ? t('hintHand') : app.wands.size ? t('hintPhone') : t('hintMouse'));
   } else ui.hint(null);
 
+  frames++;
+  if (tSec - dbgT > 0.5) { dbgT = tSec; renderDebug(); }
   if (tSec - secT > 1) {
+    app.fps = Math.round(frames / (tSec - secT)); frames = 0;
     secT = tSec;
     if (app.hand && app.hand.running) ui.setHand(`${Math.round(app.hand.fps)} fps`, 'ok');
   }
@@ -517,14 +661,18 @@ function frame(nowMs) {
 ui.setHand(t('handOff'), 'off');
 ui.setWand({ state: 'off', chip: '—', level: 'off' });
 buildList();
+loadOwnVideos();
 requestAnimationFrame(frame);
 if (qs.get('auto')) start(qs.get('auto'));
+else if (OBS) start('obs'); // no start screen on stream; the phone (wand.html?c=CODE) is the controller
 
 // test/debug API
 Object.assign(app, {
   api: {
     open: (pick) => openPortalAt(app.W / 2, app.H / 2, 0.4 * app.minDim, 1, -Math.PI / 2, pick),
     close: closePortal, hop, feed, toggleHand, start, onWandEvent, onWandMotion, setPortalRadius, setFull,
+    addFiles, addVideoUrl, removeVideo, goTo, jumpTo, toggleRec, toggleDebug, own: () => ownVideos.map((e) => e.key),
+    wandCode: () => app.wand && app.wand.code,
     state: () => ({ open: app.portal.open, full: app.portal.full, fxState: fx.portal.state, status: app.portal.status, entry: app.portal.entry && app.portal.entry.key, particles: fx.n, R: app.portal.R, fxR: Math.round(fx.portal.curR), mode: view.mode }),
   },
 });

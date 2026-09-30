@@ -7,8 +7,9 @@ const ALPH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const genCode = () => Array.from({ length: 5 }, () => ALPH[(Math.random() * ALPH.length) | 0]).join('');
 
 export class WandLink {
-  constructor({ onMotion, onEvent, onStatus }) {
+  constructor({ onMotion, onEvent, onStatus, fixedCode = null }) {
     this.onMotion = onMotion; this.onEvent = onEvent; this.onStatus = onStatus;
+    this.fixed = fixedCode; // ?code=… (OBS / streamer setups): the phone link must never change
     this.conns = new Map(); this.code = null; this.peer = null; this.started = false;
   }
 
@@ -17,7 +18,7 @@ export class WandLink {
     const Peer = window.Peer || (window.peerjs && window.peerjs.Peer);
     if (!Peer) { this.onStatus({ state: 'nolib' }); return; }
     this.started = true;
-    let code = store.get('fw.wandCode', null);
+    let code = this.fixed || store.get('fw.wandCode', null);
     if (!code) { code = genCode(); store.set('fw.wandCode', code); }
     this._open(Peer, code, 0);
   }
@@ -33,6 +34,7 @@ export class WandLink {
     peer.on('error', (err) => {
       if (err.type === 'unavailable-id') { // our code is still registered from a previous tab/session
         peer.destroy();
+        if (this.fixed) { setTimeout(() => this._open(Peer, code, attempt + 1), 5000); return; } // wait for the old registration to expire
         if (attempt < 1) setTimeout(() => this._open(Peer, code, attempt + 1), 4000);
         else { const c = genCode(); store.set('fw.wandCode', c); this._open(Peer, c, 0); }
         return;

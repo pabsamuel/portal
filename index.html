@@ -32,6 +32,7 @@
   <div id="label" class="hidden" aria-live="polite"></div>
   <div id="hint" class="hidden"></div>
   <div id="toast" class="hidden" role="status"></div>
+  <div id="debug" class="hidden"></div>
 
   <video id="cam" playsinline muted></video>
   <canvas id="camPreview" class="hidden" width="240" height="180"></canvas>
@@ -63,6 +64,9 @@
       <p class="fine" data-i18n="startFine"></p>
     </div>
   </section>
+
+  <div id="dropOverlay" class="hidden"><span data-i18n="dropHere"></span></div>
+  <input type="file" id="ownFile" accept="video/*,.mp4,.webm,.mov,.m4v" multiple hidden>
 
   <section id="panelPhone" class="panel hidden"></section>
   <section id="panelSettings" class="panel hidden"></section>

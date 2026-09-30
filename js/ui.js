@@ -12,7 +12,7 @@ export class UI {
     this.h = handlers;
     this.label = $('#label'); this.toastEl = $('#toast'); this.hintEl = $('#hint'); this.hud = $('#hud');
     this.hudAt = 0; this.entry = null; this.status = null; this.clockAt = 0; this.toastTimer = 0;
-    this.wand = { state: 'off' }; this.userCams = [];
+    this.wand = { state: 'off' }; this.userCams = []; this.ownVideos = [];
     document.addEventListener('click', (e) => {
       const b = e.target.closest('[data-act]');
       if (!b) return;
@@ -84,10 +84,18 @@ export class UI {
           <div class="addcam"><input id="ucUrl" type="url" placeholder="${esc(t('addCamUrl'))}"><input id="ucName" type="text" placeholder="${esc(t('addCamName'))}"><button data-act="add-cam">${esc(t('add'))}</button></div>
           <ul class="uclist">${this.userCams.map((c) => `<li><span>${esc(c.flag || '📍')} ${esc(tx(c.name))}</span><button class="ghost sm" data-act="remove-cam" data-key="${esc(c.key)}">${esc(t('remove'))}</button></li>`).join('')}</ul>
         </div>
+        <div class="row col"><span class="lbl">${esc(t('ownTitle'))}</span>
+          <div class="addcam"><button data-act="pick-video">${esc(t('pickVideo'))}</button></div>
+          <p class="note">${esc(t('ownHint'))}</p>
+          <div class="addcam"><input id="ovUrl" type="url" placeholder="${esc(t('videoUrl'))}"><input id="ovName" type="text" placeholder="${esc(t('videoName'))}"><button data-act="add-video-url">${esc(t('add'))}</button></div>
+          <ul class="uclist">${this.ownVideos.map((v) => `<li><span>🎬 ${esc(tx(v.name))} <small>· ${esc(t(v.local ? 'localFile' : 'linkFile'))}</small></span><span><button class="ghost sm" data-act="play-own" data-key="${esc(v.key)}">${esc(t('play'))}</button> <button class="ghost sm" data-act="remove-video" data-key="${esc(v.key)}">${esc(t('remove'))}</button></span></li>`).join('')}</ul>
+          ${this.ownVideos.length || this.userCams.length ? `<label class="tog"><input type="checkbox" data-set="onlyMine" ${settings.onlyMine ? 'checked' : ''}> ${esc(t('onlyMine'))}</label>` : ''}
+        </div>
         <div class="row"><button class="ghost" data-act="clear-dead">${esc(t('clearDead'))}</button><a class="link" href="sources.html" target="_blank" rel="noopener">${esc(t('sourcesPage'))}</a></div>
       </div>`;
   }
   setUserCams(list) { this.userCams = list; }
+  setOwnVideos(list) { this.ownVideos = list; }
 
   _onSetting(e) {
     const el = e.target;
@@ -117,7 +125,7 @@ export class UI {
   // ---------- label under the portal ----------
   showLabel(entry, status) {
     this.entry = entry; this.status = status;
-    const badge = status === 'live' ? `<span class="badge live">● ${esc(t('live'))}</span>` : status === 'recorded' ? `<span class="badge rec">${esc(t('recorded'))}</span>` : status === 'offline' ? `<span class="badge demo">${esc(t('offline'))}</span>` : '';
+    const badge = status === 'live' ? `<span class="badge live">● ${esc(t('live'))}</span>` : status === 'recorded' ? `<span class="badge rec">${esc(t('recorded'))}</span>` : status === 'offline' ? `<span class="badge demo">${esc(t('offline'))}</span>` : status === 'own' ? `<span class="badge own">🎬 ${esc(t('own'))}</span>` : '';
     this.label.innerHTML = `<div class="lname">${esc(entry.flag || '')} ${esc(tx(entry.name))}</div><div class="lsub">${badge}<span class="lplace">${esc(tx(entry.place))}</span><span class="lclock"></span></div>`;
     this.label.classList.remove('hidden');
     this.clockAt = 0;
