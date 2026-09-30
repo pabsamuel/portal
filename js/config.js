@@ -3,7 +3,7 @@ export const CONFIG = {
   // Public HTTPS address of this app (with trailing slash). The phone page needs HTTPS for the
   // gyroscope, so when the big screen runs from http://localhost the QR code points here instead.
   // Leave '' to use the current address (fine when the app itself is opened from https://…).
-  PUBLIC_BASE: '',
+  PUBLIC_BASE: 'https://pabsamuel.github.io/portal/',
 
   APP_NAME: 'Farwindow Portal',   // working title — see docs/BRAND_AND_NAMING.md
   VERSION: '0.1.0',

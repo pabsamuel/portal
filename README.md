@@ -10,7 +10,7 @@ Uzay İstasyonu, Namib Çölü’nde bir su kaynağı, Laponya’da kuzey ışı
 
 ## Hızlı başlangıç
 
-### A) Yayınlanmış link (önerilen; telefon asası için şart)
+### A) Yayınlanmış link: https://pabsamuel.github.io/portal/ (önerilen; telefon asası için şart)
 1. Laptopta Chrome ile uygulamanın https:// linkini aç, laptopu HDMI ile TV’ye / projektöre bağla, **F** ile tam ekran yap.
 2. **✋ Elimle aç** → kamera izni ver → işaret parmağınla havada daire çiz.
 3. **📱 Telefonum asa olsun** → QR’ı telefonla okut → “Asayı etkinleştir” → ortadaki daireye basılı tut, telefonla havada daire çiz.
