@@ -22,8 +22,8 @@ const S = TR ? {
 const EN_UI = {
   title: 'Portal Wand', hello: 'Your phone is now a wand', intro: 'The code from the screen is filled in. Tap to start.', code: 'Code',
   activate: 'Activate wand', hold: 'HOLD &amp; DRAW<br>A CIRCLE IN THE AIR', prev: 'Previous', random: 'Random', next: 'Next', closeP: 'Close',
-  center: 'Center', sound: 'Sound', settings: 'Settings', speed: 'Cursor speed', invert: 'Invert left/right', free: 'Draw without holding (free mode)',
-  tip: 'Tip: hold the phone like a remote and draw a wide, relaxed circle with your wrist. You can also drag your finger around the circle.',
+  center: 'Center', sound: 'Sound', fullP: 'Full', themeP: 'Theme', settings: 'Settings', speed: 'Cursor speed', invert: 'Invert left/right', free: 'Draw without holding (free mode)',
+  tip: 'Tip: hold the phone like a remote and draw a wide, relaxed circle with your wrist. While a portal is open, hold and flick the phone up for full screen, down to go back. You can also drag your finger around the circle.',
 };
 if (!TR) { document.documentElement.lang = 'en'; document.querySelectorAll('[data-t]').forEach((el) => { if (EN_UI[el.dataset.t]) el.innerHTML = EN_UI[el.dataset.t]; }); }
 

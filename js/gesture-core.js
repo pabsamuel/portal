@@ -95,9 +95,26 @@ export class CircleDetector {
     }
     return null;
   }
+  /** 0..1 — how close the current stroke is to a full circle. UI feedback only (never triggers). */
+  progress() {
+    const pts = this.pts, n = pts.length, o = this.o;
+    if (n < 4) return 0;
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const p of pts) { if (p.x < minx) minx = p.x; if (p.x > maxx) maxx = p.x; if (p.y < miny) miny = p.y; if (p.y > maxy) maxy = p.y; }
+    const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
+    let sum = 0, sumAbs = 0, sumR = 0, prev = null;
+    for (const p of pts) {
+      const a = Math.atan2(p.y - cy, p.x - cx);
+      sumR += Math.hypot(p.x - cx, p.y - cy);
+      if (prev !== null) { const d = wrapAngle(a - prev); sum += d; sumAbs += Math.abs(d); }
+      prev = a;
+    }
+    if (sumR / n < o.rMin || sumAbs === 0 || Math.abs(sum) / sumAbs < 0.6) return 0;
+    return Math.min(1, Math.abs(sum) / (o.angleFrac * TAU));
+  }
 }
 
-/** Detects a fast, straight horizontal flick. */
+/** Detects a fast, straight flick — horizontal (axis 'x') or vertical (axis 'y'). */
 export class SwipeDetector {
   constructor(opts = {}) {
     this.o = { ...DEFAULTS.swipe, ...opts };
@@ -114,7 +131,11 @@ export class SwipeDetector {
     if (t < this.coolUntil || pts.length < 4) return null;
     const a = pts[0], b = pts[pts.length - 1];
     const dx = b.x - a.x, dy = b.y - a.y;
-    if (Math.abs(dx) < o.minDx || Math.abs(dx) < o.ratio * Math.abs(dy)) return null;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    let axis;
+    if (ax >= o.minDx && ax >= o.ratio * ay) axis = 'x';
+    else if (ay >= o.minDx && ay >= o.ratio * ax) axis = 'y';
+    else return null;
     let path = 0, peak = 0, j = 0;
     for (let i = 1; i < pts.length; i++) {
       path += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
@@ -126,7 +147,8 @@ export class SwipeDetector {
     if (peak < o.peakSpeed) return null;
     this.coolUntil = t + o.cooldown;
     this.pts.length = 0;
-    return { type: 'swipe', dir: dx > 0 ? 1 : -1, speed: peak };
+    // x: +1 = right, -1 = left · y: +1 = down, -1 = up (screen coordinates)
+    return { type: 'swipe', axis, dir: axis === 'x' ? (dx > 0 ? 1 : -1) : (dy > 0 ? 1 : -1), speed: peak };
   }
 }
 

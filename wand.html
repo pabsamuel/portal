@@ -35,16 +35,18 @@
       <button data-b="prev">◀<small data-t="prev">Önceki</small></button>
       <button data-b="random">🎲<small data-t="random">Rastgele</small></button>
       <button data-b="next">▶<small data-t="next">Sonraki</small></button>
+      <button data-b="full">⛶<small data-t="fullP">Tam ekran</small></button>
       <button data-b="close">✕<small data-t="closeP">Kapat</small></button>
       <button id="recenter">⊙<small data-t="center">Ortala</small></button>
       <button data-b="mute">🔊<small data-t="sound">Ses</small></button>
+      <button data-b="theme">🎨<small data-t="themeP">Tema</small></button>
     </div>
     <details class="opts">
       <summary data-t="settings">Ayarlar</summary>
       <label><span data-t="speed">İmleç hızı</span><input id="gain" type="range" min="0.4" max="2.5" step="0.05" value="1"></label>
       <label class="row"><input id="invx" type="checkbox"> <span data-t="invert">Sağ-sol ters</span></label>
       <label class="row"><input id="free" type="checkbox"> <span data-t="free">Basılı tutmadan çiz (serbest mod)</span></label>
-      <p class="msg" data-t="tip">İpucu: Telefonu uzaktan kumanda gibi tut, bileğinle geniş ve rahat bir daire çiz. Parmağını ortadaki dairede kaydırarak da çizebilirsin.</p>
+      <p class="msg" data-t="tip">İpucu: Telefonu uzaktan kumanda gibi tut, bileğinle geniş ve rahat bir daire çiz. Portal açıkken basılı tutup telefonu hızlıca yukarı savurursan tam ekran olur, aşağı savurursan geri döner. Parmağını ortadaki dairede kaydırarak da çizebilirsin.</p>
     </details>
     <p id="sensorMsg" class="msg"></p>
   </main>

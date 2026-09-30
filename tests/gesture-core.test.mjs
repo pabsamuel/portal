@@ -91,14 +91,32 @@ test('cooldown prevents double trigger from 1.5 turns', () => {
 
 test('fast straight horizontal flick triggers a swipe (both directions)', () => {
   const right = feed(new SwipeDetector(), linePts({ x0: 0.4, y0: 0.5, x1: 0.9, y1: 0.52, dur: 0.25 }));
-  assert.ok(right); assert.equal(right.dir, 1);
+  assert.ok(right); assert.equal(right.axis, 'x'); assert.equal(right.dir, 1);
   const left = feed(new SwipeDetector(), linePts({ x0: 1.2, y0: 0.5, x1: 0.7, y1: 0.48, dur: 0.25 }));
-  assert.ok(left); assert.equal(left.dir, -1);
+  assert.ok(left); assert.equal(left.axis, 'x'); assert.equal(left.dir, -1);
 });
 
-test('slow drift and vertical flick do NOT trigger a swipe', () => {
+test('fast vertical flick triggers a y-swipe (up = -1, down = +1)', () => {
+  const up = feed(new SwipeDetector(), linePts({ x0: 0.8, y0: 0.8, x1: 0.81, y1: 0.3, dur: 0.25 }));
+  assert.ok(up); assert.equal(up.axis, 'y'); assert.equal(up.dir, -1);
+  const down = feed(new SwipeDetector(), linePts({ x0: 0.8, y0: 0.2, x1: 0.8, y1: 0.8, dur: 0.25 }));
+  assert.ok(down); assert.equal(down.axis, 'y'); assert.equal(down.dir, 1);
+});
+
+test('slow drift and diagonal flicks do NOT trigger a swipe', () => {
   assert.equal(feed(new SwipeDetector(), linePts({ x0: 0.4, y0: 0.5, x1: 0.9, y1: 0.5, dur: 1.5 })), null);
-  assert.equal(feed(new SwipeDetector(), linePts({ x0: 0.8, y0: 0.2, x1: 0.8, y1: 0.8, dur: 0.25 })), null);
+  assert.equal(feed(new SwipeDetector(), linePts({ x0: 0.4, y0: 0.2, x1: 0.8, y1: 0.6, dur: 0.25 })), null);
+});
+
+test('circle progress rises while drawing and is 0 for jitter', () => {
+  const det = new CircleDetector(); const pts = circlePts({ turns: 0.8, dur: 0.8 });
+  let mid = 0;
+  pts.forEach((p, i) => { det.push(p.x, p.y, p.t); if (i === Math.floor(pts.length / 2)) mid = det.progress(); });
+  const end = det.progress();
+  assert.ok(mid > 0.3 && mid < 0.7, `mid ${mid}`); assert.ok(end > 0.85 && end <= 1, `end ${end}`);
+  const j = new CircleDetector(); const R = rng(9);
+  for (let i = 0; i < 60; i++) j.push(0.9 + (R() - 0.5) * 0.01, 0.5 + (R() - 0.5) * 0.01, i / 60);
+  assert.equal(j.progress(), 0);
 });
 
 test('drawing circles (normal speeds) does NOT trigger swipes', () => {

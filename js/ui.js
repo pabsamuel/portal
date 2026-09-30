@@ -72,7 +72,7 @@ export class UI {
       <header><h2>⚙️ ${esc(t('settingsTitle'))}</h2><button class="x" data-act="close-panel" aria-label="${esc(t('close'))}">✕</button></header>
       <div class="rows">
         <div class="row"><span class="lbl">${esc(t('theme'))}</span>${seg('theme', THEME_KEYS, (v) => themesL[v] || v)}</div>
-        <div class="row"><span class="lbl">${esc(t('size'))}</span>${seg('size', ['gesture', 'large', 'huge'], (v) => t({ gesture: 'sizeGesture', large: 'sizeLarge', huge: 'sizeHuge' }[v]))}</div>
+        <div class="row"><span class="lbl">${esc(t('size'))}</span>${seg('size', ['gesture', 'large', 'huge', 'full'], (v) => t({ gesture: 'sizeGesture', large: 'sizeLarge', huge: 'sizeHuge', full: 'sizeFull' }[v]))}</div>
         <div class="row col"><span class="lbl">${esc(t('categories'))}</span><div class="chips">${ALL_CATS.map((c) => `<label class="chipbox"><input type="checkbox" data-cat="${c}" ${settings.cats.includes(c) ? 'checked' : ''}>${esc(catsL[c] || c)}</label>`).join('')}</div></div>
         <div class="row"><label class="tog"><input type="checkbox" data-set="sfx" ${settings.sfx ? 'checked' : ''}> ${esc(t('sfx'))}</label></div>
         <div class="row"><label class="tog"><input type="checkbox" data-set="preview" ${settings.preview ? 'checked' : ''}> ${esc(t('preview'))}</label></div>
@@ -106,7 +106,7 @@ export class UI {
 
   renderHelp() {
     const el = $('#panelHelp'); if (!el) return;
-    const rows = [['◯', 'gCircle', 'gCircleDo'], ['⇆', 'gSwipe', 'gSwipeDo'], ['✊', 'gFist', 'gFistDo'], ['✌️', 'gVictory', 'gVictoryDo'], ['👍', 'gThumb', 'gThumbDo'], ['🙌', 'gTwo', 'gTwoDo'], ['🤟', 'gRock', 'gRockDo'], ['📱', 'gShake', 'gShakeDo']];
+    const rows = [['◯', 'gCircle', 'gCircleDo'], ['⇆', 'gSwipe', 'gSwipeDo'], ['⇅', 'gFull', 'gFullDo'], ['✊', 'gFist', 'gFistDo'], ['✌️', 'gVictory', 'gVictoryDo'], ['👍', 'gThumb', 'gThumbDo'], ['🙌', 'gTwo', 'gTwoDo'], ['🤟', 'gRock', 'gRockDo'], ['📱', 'gShake', 'gShakeDo']];
     el.innerHTML = `
       <header><h2>❔ ${esc(t('helpTitle'))}</h2><button class="x" data-act="close-panel" aria-label="${esc(t('close'))}">✕</button></header>
       <ul class="gestures">${rows.map(([i, a, b]) => `<li><span class="gi">${i}</span><span class="ga">${esc(t(a))}</span><span class="gb">${esc(t(b))}</span></li>`).join('')}</ul>
@@ -122,14 +122,15 @@ export class UI {
     this.clockAt = 0;
   }
   hideLabel() { this.entry = null; this.label.classList.add('hidden'); }
-  placeLabel(cx, cy, R, rect) {
+  placeLabel(cx, cy, R, rect, full = false) {
     const W = window.innerWidth, H = window.innerHeight, st = this.label.style;
-    let top, left = rect ? W / 2 : Math.min(Math.max(cx, 220), W - 220);
-    if (rect) top = rect.y + rect.h + 18;
+    let top, left = rect || full ? W / 2 : Math.min(Math.max(cx, 220), W - 220);
+    if (full) top = H - 120; // over the full-screen video, bottom center
+    else if (rect) top = rect.y + rect.h + 18;
     else if (cy + R + 110 < H) top = cy + R + 22;
     else if (cy - R - 110 > 0) top = cy - R - 100;
     let maxW = '';
-    if (!rect && top === undefined) {
+    if (!rect && !full && top === undefined) {
       if (cx - R > 320) { left = (cx - R) / 2; top = cy - 40; maxW = cx - R - 24 + 'px'; }      // big portal: label beside it
       else if (W - cx - R > 320) { left = cx + R + (W - cx - R) / 2; top = cy - 40; maxW = W - cx - R - 24 + 'px'; }
       else top = H - 110;

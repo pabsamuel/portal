@@ -55,7 +55,7 @@ try {
     await page.screenshot({ path: join(OUT, '03-opening.png') });
     let s = await state(page);
     check('mouse circle opens a portal', s.open === true, JSON.stringify(s));
-    await sleep(1300);
+    await sleep(2200);
     s = await state(page);
     check('portal reaches open state with offline scene', s.fxState === 'open' && s.status === 'offline', JSON.stringify(s));
     await page.screenshot({ path: join(OUT, '04-open.png') });
@@ -77,6 +77,13 @@ try {
     await page.mouse.wheel(0, -300); await sleep(200);
     await page.keyboard.press('t'); await sleep(900);
     await page.screenshot({ path: join(OUT, '06-theme-aurora.png') });
+    await page.keyboard.press('Enter'); await sleep(1800);
+    s = await state(page);
+    check('Enter grows the portal to full screen', s.full === true && s.fxR > 900, JSON.stringify(s));
+    await page.screenshot({ path: join(OUT, '06b-full.png') });
+    await page.keyboard.press('ArrowDown'); await sleep(1800);
+    s = await state(page);
+    check('ArrowDown returns from full screen', s.full === false && s.fxR < 500, JSON.stringify(s));
     await page.keyboard.press('Escape'); await sleep(250);
     await page.screenshot({ path: join(OUT, '07-closing.png') });
     await sleep(700);
@@ -91,6 +98,20 @@ try {
     const fps = await page.evaluate(() => new Promise((res) => { let n = 0; const t0 = performance.now(); (function f() { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else res(n); })(); }));
     check('renders at a usable frame rate (headless, no GPU)', fps >= 20, `${fps} fps`);
     check('no JS errors (mouse page)', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // 1b) Opening animation frames (ignite → spin-up → tear open → open)
+  {
+    const { page, errors } = await newPage('index.html?offline=1&auto=mouse');
+    await page.evaluate(() => { const { feed } = window.__portal.api, t0 = performance.now() / 1000;
+      for (let i = 0; i <= 60; i++) { const a = -Math.PI / 2 + (i / 60) * Math.PI * 2 * 1.1; feed('m2', 700 + 150 * Math.cos(a), 450 + 150 * Math.sin(a), true, t0 + i * 0.016, 'mouse'); }
+      feed('m2', 700, 300, false, t0 + 1, 'mouse'); });
+    for (const [ms, name] of [[250, '1-ignite'], [650, '2-spin'], [950, '3-tear'], [1300, '4-growing'], [2200, '5-open']]) {
+      await page.waitForFunction((t) => performance.now() - window.__openedAt >= t, ms, { timeout: 5000 }).catch(() => {});
+      await page.screenshot({ path: join(OUT, `opening-${name}.png`) });
+    }
+    check('no JS errors (opening sequence)', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

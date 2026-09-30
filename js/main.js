@@ -20,14 +20,14 @@ const now = () => performance.now() / 1000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const fx = new FX($('#fx'), settings.theme);
-const view = new PortalView({ root: $('#portalView'), wrap: $('#ytWrap'), offline: $('#offlineScene') });
+const view = new PortalView({ root: $('#portalView'), wrap: $('#ytWrap'), host: $('#ytHost'), offline: $('#offlineScene') });
 const player = new LivePlayer($('#ytHost'));
 const sfx = new Sfx(); sfx.setEnabled(settings.sfx);
 
 const app = {
   W: innerWidth, H: innerHeight, minDim: Math.min(innerWidth, innerHeight),
   started: false, mode: null,
-  portal: { open: false, cx: 0, cy: 0, R: 0, entry: null, status: null },
+  portal: { open: false, full: false, pendingFull: false, cx: 0, cy: 0, R: 0, entry: null, status: null },
   list: [], pos: -1, loadToken: 0, failStreak: 0, ytDown: false,
   inputs: new Map(), filters: new Map(), wands: new Map(),
   hand: null, twoHand: null, wand: null, wandStatus: { state: 'off' },
@@ -103,17 +103,18 @@ function finishLoad(entry, status) {
 // ---------------------------------------------------------------- portal actions
 function openPortalAt(cx, cy, r, dir = 1, a0 = -Math.PI / 2, pick = 'next') {
   const { W, H, minDim } = app;
+  const from = { cx, cy, r }; // the circle as drawn — the portal ignites exactly there
   let R;
-  if (settings.size === 'large') { R = 0.44 * minDim; cx = W / 2; cy = H / 2; }
+  if (settings.size === 'large' || settings.size === 'full') { R = 0.49 * minDim; cx = W / 2; cy = H / 2; }
   else if (settings.size === 'huge') { R = 0.62 * minDim; cx = W / 2; cy = H / 2; }
-  else R = clamp(r * 1.25, 0.3 * minDim, 0.47 * minDim);
+  else R = clamp(r * 1.3, 0.36 * minDim, 0.49 * minDim);
   cx = W > 2 * R + 20 ? clamp(cx, R + 10, W - R - 10) : W / 2;
-  cy = H > 2 * R + 20 ? clamp(cy, R + 10, H - R - 10) : H / 2;
-  Object.assign(app.portal, { open: true, cx, cy, R });
+  cy = H > 2 * R + 20 ? clamp(cy, R + 8, H - R - 8) : H / 2;
+  Object.assign(app.portal, { open: true, full: false, pendingFull: settings.size === 'full', cx, cy, R });
   view.mode = 'portal'; fx.hidden = false;
-  view.setGeometry(cx, cy, R); fx.openPortal(cx, cy, R, dir, a0);
+  fx.openPortal(cx, cy, R, dir, a0, from);
   sfx.open(); buzz(60); placeLabel();
-  app.events.push({ t: now(), e: 'open' });
+  app.events.push({ t: now(), e: 'open' }); window.__openedAt = performance.now();
   buildList();
   showEntry(pick === 'random' ? randomEntry() : entryAt(1));
 }
@@ -128,7 +129,7 @@ function hop(step = 1, random = false) {
 
 function closePortal() {
   if (!app.portal.open) return;
-  app.portal.open = false; app.loadToken++;
+  app.portal.open = false; app.portal.full = false; app.portal.pendingFull = false; app.loadToken++;
   fx.closePortal(); sfx.close(); buzz(40); ui.hideLabel();
   view.mode = 'portal'; fx.hidden = false;
   app.events.push({ t: now(), e: 'close' });
@@ -137,13 +138,23 @@ function closePortal() {
 }
 
 function setPortalRadius(R) {
-  if (!app.portal.open) return;
+  if (!app.portal.open || app.portal.full) return;
   const p = app.portal;
   p.R = clamp(R, 0.18 * app.minDim, 0.75 * app.minDim);
-  fx.setGeometry(p.cx, p.cy, p.R); view.setGeometry(p.cx, p.cy, p.R); placeLabel();
+  fx.setGeometry(p.cx, p.cy, p.R); placeLabel();
 }
 
-function placeLabel() { const p = app.portal; ui.placeLabel(p.cx, p.cy, p.R, view.mode === 'window' ? view.rect : null); }
+/** Grow the portal over the whole screen ("step through") or shrink it back. */
+function setFull(on) {
+  const p = app.portal;
+  if (!p.open || fx.portal.state === 'closing' || on === p.full) return;
+  p.full = on; p.pendingFull = false;
+  fx.setFull(on); sfx.full(); buzz(50); placeLabel(); sendState();
+  app.events.push({ t: now(), e: on ? 'full' : 'unfull' });
+}
+function toggleFull() { if (!app.portal.open) hop(0, true); else setFull(!app.portal.full); }
+
+function placeLabel() { const p = app.portal; ui.placeLabel(p.cx, p.cy, p.R, view.mode === 'window' ? view.rect : null, p.full); }
 
 function toggleVideoSound() { app.videoMuted = !app.videoMuted; player.setMuted(app.videoMuted); ui.toast(app.videoMuted ? t('soundOff') : t('soundOn')); }
 function toggleSfx() { settings.sfx = !settings.sfx; saveSettings(); sfx.setEnabled(settings.sfx); ui.toast(settings.sfx ? t('sfxOn') : t('sfxOff')); }
@@ -162,11 +173,15 @@ function feed(id, x, y, drawing, tSec, kind) {
   let inp = app.inputs.get(id);
   if (!inp) { inp = { circle: new CircleDetector(), swipe: new SwipeDetector(), kind, wasDrawing: false }; app.inputs.set(id, inp); }
   inp.x = x; inp.y = y; inp.lastT = tSec; inp.kind = kind;
-  fx.setPointer(id, x, y, drawing, kind, tSec);
-  if (!drawing) { if (inp.wasDrawing) { inp.circle.reset(); inp.swipe.reset(); } inp.wasDrawing = false; return; }
+  if (!drawing) {
+    fx.setPointer(id, x, y, false, kind, tSec, 0);
+    if (inp.wasDrawing) { inp.circle.reset(); inp.swipe.reset(); }
+    inp.wasDrawing = false; return;
+  }
   inp.wasDrawing = true; app.lastActivity = tSec;
   const ux = x / app.minDim, uy = y / app.minDim;
   const c = inp.circle.push(ux, uy, tSec);
+  fx.setPointer(id, x, y, true, kind, tSec, c ? 1 : inp.circle.progress());
   if (c) {
     inp.swipe.reset(); fx.clearTrail(id);
     app.events.push({ t: tSec, e: 'circle', id, r: c.r, dir: c.dir });
@@ -177,8 +192,9 @@ function feed(id, x, y, drawing, tSec, kind) {
   const s = inp.swipe.push(ux, uy, tSec);
   if (s && app.portal.open && fx.portal.state === 'open') {
     inp.circle.reset(); fx.clearTrail(id);
-    app.events.push({ t: tSec, e: 'swipe', id, dir: s.dir });
-    hop(s.dir);
+    app.events.push({ t: tSec, e: 'swipe', id, axis: s.axis, dir: s.dir });
+    if (s.axis === 'x') hop(s.dir);
+    else setFull(s.dir < 0); // flick up = step into full screen, flick down = back to the portal
   }
 }
 function removeInput(id) { fx.removePointer(id); app.inputs.delete(id); }
@@ -189,18 +205,27 @@ const isUi = (el) => !!(el && el.closest && el.closest('#hud, .panel, #start, bu
 addEventListener('pointerdown', (e) => {
   if (!app.started || isUi(e.target) || e.button === 2) return;
   mouseDown = true; sfx.resume();
-  feed('mouse', e.clientX, e.clientY, true, now(), 'mouse');
+  feed('mouse', e.clientX, e.clientY, true, e.timeStamp / 1000, 'mouse');
 });
 addEventListener('pointermove', (e) => {
   if (!app.started || (!mouseDown && isUi(e.target))) return;
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
-  if (evs.length > 1) for (const ce of evs) feed('mouse', ce.clientX, ce.clientY, mouseDown, now(), 'mouse');
-  else feed('mouse', e.clientX, e.clientY, mouseDown, now(), 'mouse');
+  // Use each event's own timestamp: coalesced events arrive together, and giving them all "now"
+  // squashed the stroke in time (broken circles, fake swipes).
+  if (evs.length > 1) for (const ce of evs) feed('mouse', ce.clientX, ce.clientY, mouseDown, ce.timeStamp / 1000, 'mouse');
+  else feed('mouse', e.clientX, e.clientY, mouseDown, e.timeStamp / 1000, 'mouse');
 }, { passive: true });
 const mouseUp = () => { if (!mouseDown) return; mouseDown = false; const i = app.inputs.get('mouse'); if (i) feed('mouse', i.x, i.y, false, now(), 'mouse'); };
 addEventListener('pointerup', mouseUp); addEventListener('pointercancel', mouseUp);
 addEventListener('contextmenu', (e) => { if (!isUi(e.target)) { e.preventDefault(); closePortal(); } });
-addEventListener('wheel', (e) => { if (app.portal.open && !isUi(e.target)) setPortalRadius(app.portal.R * (e.deltaY < 0 ? 1.06 : 1 / 1.06)); }, { passive: true });
+addEventListener('wheel', (e) => {
+  if (!app.portal.open || isUi(e.target)) return;
+  const up = e.deltaY < 0;
+  if (app.portal.full) { if (!up) setFull(false); return; }
+  if (up && app.portal.R * 1.06 > 0.74 * app.minDim) setFull(true);
+  else setPortalRadius(app.portal.R * (up ? 1.06 : 1 / 1.06));
+}, { passive: true });
+addEventListener('dblclick', (e) => { if (app.started && !isUi(e.target)) toggleFull(); });
 
 // ---- keyboard
 addEventListener('keydown', (e) => {
@@ -211,7 +236,10 @@ addEventListener('keydown', (e) => {
     case ' ': e.preventDefault(); hop(0, true); break;
     case 'ArrowRight': hop(1); break;
     case 'ArrowLeft': hop(-1); break;
-    case 'Escape': if (ui.panelOpen()) ui.closePanels(); else closePortal(); break;
+    case 'Escape': if (ui.panelOpen()) ui.closePanels(); else if (app.portal.full) setFull(false); else closePortal(); break;
+    case 'Enter': toggleFull(); break;
+    case 'ArrowUp': if (app.portal.open) setFull(true); break;
+    case 'ArrowDown': if (app.portal.full) setFull(false); break;
     case 'Backspace': closePortal(); break;
     case 'f': case 'F': toggleFullscreen(); break;
     case 'm': case 'M': toggleVideoSound(); break;
@@ -295,11 +323,15 @@ function twoHandResize(hands) {
   const palms = hands.filter((h) => h.gesture === 'Open_Palm');
   if (app.portal.open && fx.portal.state === 'open' && palms.length === 2) {
     const d = Math.hypot(palms[0].wristX - palms[1].wristX, palms[0].wristY - palms[1].wristY);
-    if (!app.twoHand) app.twoHand = { d0: Math.max(0.05, d), R0: app.portal.R };
-    else {
-      const R = app.twoHand.R0 * (d / app.twoHand.d0);
-      if (Math.abs(R - app.portal.R) > app.minDim * 0.01) setPortalRadius(R);
+    if (!app.twoHand) { app.twoHand = { d0: Math.max(0.05, d), R0: app.portal.R }; return; }
+    const ratio = d / app.twoHand.d0;
+    if (app.portal.full) { // hands brought together → back to the portal
+      if (ratio < 0.65) { setFull(false); app.twoHand = { d0: Math.max(0.05, d), R0: app.portal.R }; }
+      return;
     }
+    const R = app.twoHand.R0 * ratio;
+    if (R > 0.9 * app.minDim) { setFull(true); app.twoHand = { d0: Math.max(0.05, d), R0: app.portal.R }; } // stretched wide → full screen
+    else if (Math.abs(R - app.portal.R) > app.minDim * 0.01) setPortalRadius(R);
   } else app.twoHand = null;
 }
 
@@ -337,6 +369,7 @@ function onWandEvent(id, msg) {
         case 'close': closePortal(); break;
         case 'mute': toggleVideoSound(); break;
         case 'theme': cycleTheme(); break;
+        case 'full': toggleFull(); break;
         default: break;
       }
       break;
@@ -407,9 +440,12 @@ function settingChanged(key) {
       $('#camPreview').classList.toggle('hidden', !(settings.preview && app.hand && app.hand.running && !FAKE_HAND)); break;
     case 'cats': buildList(); app.pos = -1; break;
     case 'size':
-      if (app.portal.open && settings.size !== 'gesture') {
+      if (!app.portal.open) break;
+      if (settings.size === 'full') { setFull(true); break; }
+      if (app.portal.full) setFull(false);
+      if (settings.size !== 'gesture') {
         const p = app.portal; p.cx = app.W / 2; p.cy = app.H / 2;
-        setPortalRadius((settings.size === 'huge' ? 0.62 : 0.44) * app.minDim);
+        setPortalRadius((settings.size === 'huge' ? 0.62 : 0.49) * app.minDim);
       }
       break;
     default: break;
@@ -426,11 +462,11 @@ function start(mode) {
 
 addEventListener('resize', () => {
   app.W = innerWidth; app.H = innerHeight; app.minDim = Math.min(app.W, app.H);
-  fx.resize();
+  fx.resize(); view.layout();
   if (app.portal.open) {
     const p = app.portal, R = Math.min(p.R, 0.49 * app.minDim);
     p.cx = clamp(p.cx, R, app.W - R); p.cy = clamp(p.cy, R, app.H - R);
-    setPortalRadius(R);
+    if (p.full) { p.R = R; fx.setGeometry(p.cx, p.cy, R); placeLabel(); } else setPortalRadius(R);
   }
 });
 
@@ -446,9 +482,10 @@ function frame(nowMs) {
   const wantWin = settings.compliant && app.portal.open && (app.portal.status === 'live' || app.portal.status === 'recorded') && fx.portal.state === 'open';
   if (wantWin !== (view.mode === 'window')) {
     view.mode = wantWin ? 'window' : 'portal'; fx.hidden = wantWin;
-    view.setGeometry(app.portal.cx, app.portal.cy, app.portal.R); placeLabel();
+    view.frame(fx.portal.cx, fx.portal.cy, fx.portal.clipR, fx.portal.videoR); placeLabel();
   }
-  view.setClip(view.mode === 'window' ? 1 : fx.portal.clipR);
+  view.frame(fx.portal.cx, fx.portal.cy, fx.portal.clipR, fx.portal.videoR);
+  if (app.portal.pendingFull && fx.portal.state === 'open') setFull(true); // "Full screen" size setting
   view.renderOffline(tSec, dt);
   fx.render();
   sfx.tick(dt);
@@ -477,7 +514,7 @@ if (qs.get('auto')) start(qs.get('auto'));
 Object.assign(app, {
   api: {
     open: (pick) => openPortalAt(app.W / 2, app.H / 2, 0.4 * app.minDim, 1, -Math.PI / 2, pick),
-    close: closePortal, hop, feed, toggleHand, start, onWandEvent, onWandMotion, setPortalRadius,
-    state: () => ({ open: app.portal.open, fxState: fx.portal.state, status: app.portal.status, entry: app.portal.entry && app.portal.entry.key, particles: fx.n, R: app.portal.R, mode: view.mode }),
+    close: closePortal, hop, feed, toggleHand, start, onWandEvent, onWandMotion, setPortalRadius, setFull,
+    state: () => ({ open: app.portal.open, full: app.portal.full, fxState: fx.portal.state, status: app.portal.status, entry: app.portal.entry && app.portal.entry.key, particles: fx.n, R: app.portal.R, fxR: Math.round(fx.portal.curR), mode: view.mode }),
   },
 });

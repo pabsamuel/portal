@@ -22,9 +22,9 @@ export class Sfx {
   resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
   setEnabled(v) { this.enabled = v; if (this.master) this.master.gain.value = v ? 0.55 : 0; }
 
-  _whoosh(f0, f1, dur, vol) {
+  _whoosh(f0, f1, dur, vol, delay = 0) {
     const c = this.ctx; if (!c) return;
-    const t = c.currentTime, src = c.createBufferSource(); src.buffer = this.noise;
+    const t = c.currentTime + delay, src = c.createBufferSource(); src.buffer = this.noise;
     const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
     bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
     const g = c.createGain();
@@ -32,9 +32,9 @@ export class Sfx {
     src.connect(bp); bp.connect(g); g.connect(this.master);
     src.start(t, Math.random()); src.stop(t + dur + 0.05);
   }
-  _thump(f0 = 90, f1 = 38, dur = 0.38, vol = 0.55) {
+  _thump(f0 = 90, f1 = 38, dur = 0.38, vol = 0.55, delay = 0) {
     const c = this.ctx; if (!c) return;
-    const t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
     o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.02);
@@ -47,10 +47,20 @@ export class Sfx {
     src.connect(hp); hp.connect(g); g.connect(this.master);
     src.start(when, Math.random() * 1.5); src.stop(when + len + 0.02);
   }
-  _crackle(n, spread) { if (!this.ctx) return; const t = this.ctx.currentTime; for (let i = 0; i < n; i++) this._click(t + Math.random() * spread, 0.03 + Math.random() * 0.09); }
+  _crackle(n, spread, delay = 0) { if (!this.ctx) return; const t = this.ctx.currentTime + delay; for (let i = 0; i < n; i++) this._click(t + Math.random() * spread, 0.03 + Math.random() * 0.09); }
   _setHum(on) { if (!this.hum) return; const t = this.ctx.currentTime; this.hum.gain.cancelScheduledValues(t); this.hum.gain.setTargetAtTime(on ? 0.05 : 0, t, 0.3); }
 
-  open() { if (!this.ctx) return; this._whoosh(250, 2600, 0.9, 0.5); this._thump(); this._crackle(40, 0.9); this.active = true; this._setHum(true); }
+  // Synced with OPEN_T in portal-fx.js: ignite (0–0.5 s) → spin-up (→0.78 s) → tear open
+  open() {
+    if (!this.ctx) return;
+    this._crackle(45, 0.5);                       // ignition sizzle
+    this._whoosh(180, 1400, 0.8, 0.22);           // energy gathering
+    this._whoosh(300, 3200, 0.75, 0.6, 0.76);     // tear open
+    this._thump(95, 36, 0.45, 0.7, 0.76);
+    this._crackle(50, 0.6, 0.76);
+    this.active = true; this._setHum(true);
+  }
+  full() { if (!this.ctx) return; this._whoosh(200, 3600, 0.9, 0.45); this._thump(70, 30, 0.5, 0.4); }
   close() { if (!this.ctx) return; this._whoosh(2400, 200, 0.5, 0.4); this._thump(70, 30, 0.3, 0.35); this._crackle(25, 0.3); this.active = false; this._setHum(false); }
   hop() { if (!this.ctx) return; this._whoosh(600, 3200, 0.6, 0.35); this._crackle(20, 0.5); }
   tick(dt) { // continuous sizzle while a portal is open
