@@ -39,7 +39,13 @@ window.__portal = app; // for debugging and automated tests
 // ---------------------------------------------------------------- destinations
 const dead = store.get('fw.dead', {});
 const isDead = (key) => !!dead[key] && Date.now() - dead[key] < CONFIG.DEAD_TTL_MS;
-function markDead(key, code) { dead[key] = Date.now(); store.set('fw.dead', dead); console.info('[portal] source failed → skipped for 6 h:', key, code); }
+function markDead(key, code) {
+  const soft = code === 'timeout' || code === 'ended' || code === 'player';
+  // store a back-dated timestamp so soft failures expire after 1 h instead of DEAD_TTL (6 h)
+  dead[key] = soft ? Date.now() - (CONFIG.DEAD_TTL_MS - 60 * 60 * 1000) : Date.now();
+  store.set('fw.dead', dead);
+  console.info(`[portal] source failed (${code}) → skipped for ${soft ? '1 h' : '6 h'}:`, key);
+}
 let userCams = store.get('fw.userCams', []);
 
 function buildList() {

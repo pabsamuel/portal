@@ -41,7 +41,7 @@ export class PortalView {
   /** r = visible radius in px (0 hides). In window mode r>0 simply shows the rectangle. */
   setClip(r) {
     const rs = this.root.style;
-    if (r <= 0.5) { if (rs.visibility !== 'hidden') rs.visibility = 'hidden'; return; }
+    if (r <= 0.5) { if (rs.visibility !== 'hidden') { rs.visibility = 'hidden'; rs.clipPath = 'circle(0px at 50% 50%)'; } return; }
     if (rs.visibility !== 'visible') rs.visibility = 'visible';
     rs.clipPath = this.mode === 'window' ? 'none' : `circle(${r.toFixed(1)}px at 50% 50%)`;
   }
@@ -49,7 +49,7 @@ export class PortalView {
   showOffline(on) {
     this.offlineOn = on;
     this.off.style.display = on ? 'block' : 'none';
-    this.wrap.style.visibility = on ? 'hidden' : 'visible';
+    this.wrap.style.visibility = on ? 'hidden' : ''; // '' = inherit; 'visible' would override the hidden parent
   }
 
   /** Procedural "cosmic void": nebula + warp-speed stars. Needs no internet. */

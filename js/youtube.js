@@ -36,13 +36,19 @@ export class LivePlayer {
     this._cancelPending();
     const my = ++this.token;
     return new Promise((resolve, reject) => {
-      let done = false;
+      let done = false, visibleMs = 0;
       const finish = (ok, info) => {
-        if (done) return; done = true; clearTimeout(timer);
+        if (done) return; done = true; clearInterval(timer);
         if (this.pending && this.pending.my === my) this.pending = null;
         ok ? resolve(info) : reject(info);
       };
-      const timer = setTimeout(() => finish(false, { code: 'timeout' }), timeoutMs);
+      // Browsers defer autoplay in hidden tabs, so only count time while the page is visible;
+      // otherwise switching tabs would wrongly mark every cam as dead.
+      const timer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        visibleMs += 250;
+        if (visibleMs >= timeoutMs) finish(false, { code: 'timeout' });
+      }, 250);
       this.pending = { my, finish };
       this.handlers = {
         state: (e) => {
