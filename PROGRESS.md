@@ -3,8 +3,8 @@
 > **Bu dosya projenin tek doğruluk kaynağıdır.** Her Claude oturumu bununla başlar ve bununla biter.
 > Kural: Claude her cevabında aşağıdaki **toplam yüzdeyi** söyler.
 
-## Toplam: **%23** — Faz 1 (Prototip) %57 · Faz 2 %0 · Faz 3 %0 · Faz 4 %0
-_Son güncelleme: 30 Eyl 2026 — v0.1.0 prototip kodu yazıldı ve tarayıcıda test edildi; gerçek cihaz testi bekliyor._
+## Toplam: **%27** — Faz 1 (Prototip) %61 · Faz 2 %15 · Faz 3 %0 · Faz 4 %0
+_Son güncelleme: 30 Eyl 2026 — v0.2.0 yayında: https://pabsamuel.github.io/portal/ (Samet'in Chrome'unda canlı yayın portalda oynadı)._
 
 ### Puanlama kuralı (dürüst yüzde için)
 Her iş kaleminin bir ağırlığı var (toplam 100). Kalemin ne kadarının sayıldığını durum belirler:
@@ -21,18 +21,18 @@ Kodun yazılmış olması bitti demek değil. “Bitti” = senin TV’nde ve te
 | # | Kalem | Ağırlık | Durum | Puan |
 |---|---|---|---|---|
 | P1 | Proje iskeleti + tüm dokümanlar + promptlar | 4 | ✅ | 4.0 |
-| P2 | Portal efekti (kıvılcım halka, açılış/kapanış/zıplama, 4 tema, sesler) | 8 | 🟠 | 5.6 |
-| P3 | Canlı kamera içeriği (YouTube portal içinde, ölü kamerayı atlama, kaynak kontrol sayfası, çevrimdışı yedek) | 6 | 🟡 (yedek 🟠) | 2.4 |
-| P4 | Fare / dokunmatik ile daire çizme | 2 | 🟠 | 1.4 |
+| P2 | Portal efekti (ateşleme → hızlanma → yırtılma açılışı, girdap, tam ekran, ortam ışığı, 4 tema, sesler) | 8 | 🟠 (yeni sürüm cihazda onay bekliyor) | 5.6 |
+| P3 | Canlı kamera içeriği (158 yer / 229 yayın, arka planda hazırlanan kesintisiz geçiş, ölü yayını görünmeden atlama) | 6 | 🟠 (Samet'in Chrome'unda oynadı; yeni deste sistemi onay bekliyor) | 4.2 |
+| P4 | Fare / dokunmatik ile daire çizme | 2 | 🟠 (zaman damgası hatası düzeltildi, onay bekliyor) | 1.4 |
 | P5 | El takibi (laptop kamerası, MediaPipe) | 8 | 🟡 (sahte elle 🟠) | 3.2 |
 | P6 | Telefon asa (jiroskop + QR eşleştirme + dokunmatik ped) | 8 | 🟡 (protokol 🟠) | 3.2 |
-| P7 | Ek jestler (kaydırma, ✊ kapat, ✌️ rastgele, 👍 ses, 🙌 boyut, 🤟 tema, sallama) | 4 | 🟠 | 2.8 |
-| | **Faz 1 toplam** | **40** | | **22.6** |
+| P7 | Ek jestler (sağ/sol kaydırma, yukarı/aşağı = tam ekran, ✊ kapat, ✌️ rastgele, 👍 ses, 🙌 boyut/tam ekran, 🤟 tema, sallama) | 4 | 🟠 | 2.8 |
+| | **Faz 1 toplam** | **40** | | **24.4** |
 
 ## Faz 2 — Doğrulama (ağırlık 20)
 | # | Kalem | Ağırlık | Durum |
 |---|---|---|---|
-| V1 | HTTPS’te yayınla (GitHub Pages linki; telefon için şart) | 3 | ⬜ (izin bekliyor) |
+| V1 | HTTPS’te yayınla (GitHub Pages linki; telefon için şart) | 3 | ✅ https://pabsamuel.github.io/portal/ |
 | V2 | Gerçek cihaz testi — Teknik Kapı (docs/TEST_CHECKLIST.md) | 5 | ⬜ |
 | V3 | Tanıtım sayfası + bekleme listesi | 4 | ⬜ |
 | V4 | 10–12 kısa video çek ve paylaş | 6 | ⬜ |
@@ -57,11 +57,13 @@ Kodun yazılmış olması bitti demek değil. “Bitti” = senin TV’nde ve te
 ---
 
 ## Sıradaki TEK iş
-**V1 + V2:** Uygulamayı HTTPS’te yayınla, sonra `docs/TEST_CHECKLIST.md`’yi laptop+TV ve telefonla doldur.
+**V2:** `docs/TEST_CHECKLIST.md`’yi laptop+TV ve telefonla doldur (özellikle el kamerası ve telefon asası hiç denenmedi).
 Sonuçları `prompts/01_device_test_fixes.md` ile Claude’a ver.
 
 ## Bilinen açıklar / riskler (dürüst liste)
-- 🔴 **Kamera ID’leri doğrulanmadı.** Arama sonuçlarından toplandı; bu ortamdan YouTube’a erişilemedi. Uygulama çalışmayanı otomatik atlıyor ama ilk açılışta bazı yerler “kapalı” çıkabilir → `sources.html` ile test et, `prompts/03_curate_sources.md`.
+- 🟠 **Kamera listesi zamanla çürür.** 229 yayının çoğu 30 Eyl’de “şu an canlı” aramasından alındı; kanallar yayın ID’sini değiştirdikçe ölür. Kullanıcı görmez (deste sistemi atlar) ama liste küçülür → ayda bir `sources.html` + `prompts/03_curate_sources.md`.
+- 🟠 **Türkiye kategorisi zayıf (4 yer, doğrulanmamış).** Türk şehir kameraları YouTube’da neredeyse yok (İBB kendi sitesinde yayınlıyor). Çözüm: izinli kaynak bulmak ya da kendi çekimin (Tier A).
+- 🟡 Deste sistemi iki oynatıcı kullanır: portal açıkken ~2 yayın kadar bant genişliği.
 - 🟠 El takibi gerçek kamerayla hiç denenmedi (sadece sahte el senaryosuyla). Işık, mesafe ve hız ayarı gerekebilir.
 - 🟠 Telefon eşleştirme ücretsiz PeerJS sunucusuna bağlı; farklı ağlarda (telefon 4.5G, laptop Wi-Fi) bağlanamayabilir. Aynı Wi-Fi önerilir.
 - 🟠 YouTube yayınını daire içinde kırpıp üstüne efekt çizmek YouTube API kurallarına aykırı. Prototip/kişisel kullanım için sorun değil ama **mağazaya/satışa çıkmadan önce** “Uyumlu mod” varsayılan olmalı ya da içerik lisanslı olmalı (docs/CAMERA_SOURCES_AND_LICENSING.md).
@@ -73,6 +75,7 @@ Sonuçları `prompts/01_device_test_fixes.md` ile Claude’a ver.
 - 30 Eyl 2026 — Görsel: jenerik kıvılcım halkası; film adı/logo/rün/mandala yok (mağaza ret riski).
 
 ## Değişiklik günlüğü
+- **v0.2.0 — 30 Eyl 2026:** Samet'in canlı test geri bildirimleriyle: sinematik açılış (çizilen yerde ateşleme → hızlanma → ışıkla yırtılma), tam ekran portal (yukarı savur / Enter / çift tık / iki el / ⛶), ortam ışığı (portal çevresi bulanık canlı görüntü), iki oynatıcılı kesintisiz geçiş (ölü/kayıt yayınlar görünmeden elenir, uyarı mesajı yok), 158 yer / 229 yayın, fare çiziminde zaman damgası hatası düzeltildi, iz ilerleme parlaması, dikey kaydırma. GitHub Pages’te yayında.
 - **v0.1.0 — 30 Eyl 2026:** İlk prototip. Portal efekti, 37 canlı kamera noktası (+alternatif ID’ler), fare/el/telefon girişleri, 8 jest, TR/EN arayüz, ayarlar, kendi yayınını ekleme, kaynak kontrol sayfası, çevrimdışı demo portal. Testler: 20 birim testi + 21 tarayıcı kontrolü geçti.
 
 ## Haftalık kontrol (her hafta ilk izin gününde, 15 dk)

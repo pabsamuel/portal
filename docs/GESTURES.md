@@ -8,7 +8,8 @@ identical and unit-testable (`npm test`, 20 tests).
 | Gesture | Input | Action | Method |
 |---|---|---|---|
 | ◯ Circle (either direction) | hand / wand / mouse | Open portal at the circle; if open → jump to a random place | Angle accumulation (below) |
-| ⇆ Flick left/right | hand / wand / mouse | Previous / next place (only while a portal is open) | Straight fast stroke |
+| ⇆ Flick left/right | hand / wand / mouse | Previous / next place (only while a portal is open) | Straight fast stroke (axis x) |
+| ⇅ Flick up / down | hand / wand / mouse | Full-screen portal / back (also Enter, double-click, wheel past max, 🙌 spread wide) | Straight fast stroke (axis y) |
 | ✊ Fist held 0.5 s | hand | Close | MediaPipe `Closed_Fist` + hold |
 | 👎 Thumb down held 0.5 s | hand | Close | `Thumb_Down` + hold |
 | ✌️ Victory held 0.5 s | hand | Random place (opens if closed) | `Victory` + hold |
@@ -38,7 +39,7 @@ For each new point, look back over the last `tMax` seconds and try windows (long
 Direction = sign(ΣΔθ) (screen y points down → positive = clockwise). The portal’s sparks spin the same way.
 
 ## Swipe detector
-Window 0.5 s; |dx| ≥ 0.3 units; |dx| ≥ 2·|dy|; straightness (displacement / path) ≥ 0.9; peak speed ≥ 1.8 units/s over
+Window 0.5 s; dominant axis travel ≥ 0.3 units and ≥ 2× the other axis (x → next/prev, y → full screen); straightness (displacement / path) ≥ 0.9; peak speed ≥ 1.8 units/s over
 any ≥ 60 ms sub-window; cooldown 0.6 s. Tested so that normal circles (r 0.15–0.4, 0.6–2.0 s) never trigger a swipe.
 
 ## Webcam mapping (hand)

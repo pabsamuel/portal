@@ -4,7 +4,7 @@ Havada elinle ya da telefonunla **bir daire çiz**. TV’de veya projektörde k�
 ve içinden dünyanın bir yerindeki **canlı kamera** görünür: Tokyo’da Shibuya, İstanbul’da Haliç,
 Uzay İstasyonu, Namib Çölü’nde bir su kaynağı, Laponya’da kuzey ışıkları…
 
-**Durum:** v0.1.0 prototip · **Proje ilerlemesi: %23** → ayrıntı [PROGRESS.md](PROGRESS.md)
+**Durum:** v0.2.0 prototip · canlı: https://pabsamuel.github.io/portal/ · **Proje ilerlemesi: %27** → ayrıntı [PROGRESS.md](PROGRESS.md)
 
 ---
 
@@ -35,6 +35,7 @@ Uzay İstasyonu, Namib Çölü’nde bir su kaynağı, Laponya’da kuzey ışı
 |---|---|
 | ◯ Havada daire çiz (el, telefon ya da fare) | Portal açılır · açıkken yeni yere zıplar |
 | ⇆ Hızlıca sağa/sola savur | Sonraki / önceki kamera |
+| ⇅ Hızlıca yukarı savur · Enter · çift tık · iki eli iyice aç · telefonda ⛶ | Portal tüm ekranı kaplar; aşağı savur / Esc ile geri |
 | ✊ Yumruk (yarım saniye) | Portal kapanır |
 | ✌️ Zafer işareti · 📱 sallamak · Boşluk tuşu | Rastgele yer |
 | 👍 Başparmak · **M** | Video sesi aç/kapat |

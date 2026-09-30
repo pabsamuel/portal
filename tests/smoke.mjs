@@ -186,7 +186,7 @@ try {
   {
     const { page, errors } = await newPage('sources.html');
     const rows = await page.evaluate(() => window.__sources.rows);
-    check('source checker lists all sources', rows > 40, `${rows} rows`);
+    check('source checker lists all sources', rows > 150, `${rows} rows`);
     check('no JS errors (sources page)', errors.length === 0, errors.join(' | '));
     await page.close();
   }

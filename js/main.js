@@ -4,7 +4,7 @@ import { CircleDetector, SwipeDetector, HoldDetector, OneEuro, clamp } from './g
 import { FX, THEME_KEYS } from './portal-fx.js';
 import { PortalView } from './portal-view.js';
 import { Deck } from './deck.js';
-import { CAMS, OFFLINE_CAM, sourcesOf, parseYouTubeId } from './cams.js';
+import { CAMS, FEATURED_COUNT, OFFLINE_CAM, sourcesOf, parseYouTubeId } from './cams.js';
 import { Sfx } from './audio.js';
 import { settings, saveSettings, store } from './settings.js';
 import { t, tx } from './i18n.js';
@@ -52,7 +52,7 @@ const alive = (e) => sourcesOf(e).some((s) => !isDead(s.key));
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 function buildList() {
   const ok = (e) => e.user || settings.cats.includes(e.cat);
-  const users = userCams.filter(ok), featured = CAMS.slice(0, 12).filter(ok), rest = CAMS.slice(12).filter(ok);
+  const users = userCams.filter(ok), featured = CAMS.slice(0, FEATURED_COUNT).filter(ok), rest = CAMS.slice(FEATURED_COUNT).filter(ok);
   app.list = [...users, ...shuffle(featured), ...shuffle(rest)]; // user cams first, then a fresh random tour
   app.pos = -1;
 }
