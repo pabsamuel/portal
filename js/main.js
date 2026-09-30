@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { CircleDetector, SwipeDetector, HoldDetector, OneEuro, clamp } from './gesture-core.js';
 import { FX, THEME_KEYS } from './portal-fx.js';
 import { PortalView } from './portal-view.js';
-import { LivePlayer } from './youtube.js';
+import { Deck } from './deck.js';
 import { CAMS, OFFLINE_CAM, sourcesOf, parseYouTubeId } from './cams.js';
 import { Sfx } from './audio.js';
 import { settings, saveSettings, store } from './settings.js';
@@ -20,19 +20,19 @@ const now = () => performance.now() / 1000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const fx = new FX($('#fx'), settings.theme);
-const view = new PortalView({ root: $('#portalView'), wrap: $('#ytWrap'), host: $('#ytHost'), offline: $('#offlineScene') });
-const player = new LivePlayer($('#ytHost'));
+const view = new PortalView({ root: $('#portalView'), wrap: $('#ytWrap'), host: $('#ytHosts'), offline: $('#offlineScene'), ambient: $('#ambient') });
+view.ambientOn = settings.ambient;
 const sfx = new Sfx(); sfx.setEnabled(settings.sfx);
 
 const app = {
   W: innerWidth, H: innerHeight, minDim: Math.min(innerWidth, innerHeight),
   started: false, mode: null,
   portal: { open: false, full: false, pendingFull: false, cx: 0, cy: 0, R: 0, entry: null, status: null },
-  list: [], pos: -1, loadToken: 0, failStreak: 0, ytDown: false,
+  list: [], pos: -1, loadToken: 0, ytDown: false, history: [],
   inputs: new Map(), filters: new Map(), wands: new Map(),
   hand: null, twoHand: null, wand: null, wandStatus: { state: 'off' },
   lastActivity: 0, videoMuted: true, hudPinned: false, events: [],
-  fx, view, player,
+  fx, view,
 };
 window.__portal = app; // for debugging and automated tests
 
@@ -48,50 +48,53 @@ function markDead(key, code) {
 }
 let userCams = store.get('fw.userCams', []);
 
+const alive = (e) => sourcesOf(e).some((s) => !isDead(s.key));
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 function buildList() {
-  const all = [...userCams, ...CAMS];
-  app.list = all.filter((e) => (e.user || settings.cats.includes(e.cat)) && sourcesOf(e).some((s) => !isDead(s.key)));
-  if (!app.list.length) app.list = [OFFLINE_CAM];
-  if (app.pos >= app.list.length) app.pos = app.list.length - 1;
+  const ok = (e) => e.user || settings.cats.includes(e.cat);
+  const users = userCams.filter(ok), featured = CAMS.slice(0, 12).filter(ok), rest = CAMS.slice(12).filter(ok);
+  app.list = [...users, ...shuffle(featured), ...shuffle(rest)]; // user cams first, then a fresh random tour
+  app.pos = -1;
 }
-function entryAt(step) { const n = app.list.length; app.pos = (((app.pos + step) % n) + n) % n; return app.list[app.pos]; }
-function randomEntry() {
-  const n = app.list.length; if (n <= 1) return entryAt(1);
-  let i; do { i = (Math.random() * n) | 0; } while (i === app.pos);
-  app.pos = i; return app.list[i];
+/** Next destination in the tour that still has a working source (dead ones are skipped silently). */
+function nextEntry() {
+  const n = app.list.length;
+  for (let k = 0; k < n; k++) {
+    app.pos = (app.pos + 1) % n;
+    const e = app.list[app.pos];
+    if (alive(e)) return e;
+  }
+  return null;
 }
+function pushHistory(e) { if (app.history[app.history.length - 1] !== e) app.history.push(e); if (app.history.length > 30) app.history.shift(); }
+function prevEntry() { if (app.history.length < 2) return null; app.history.pop(); return app.history.pop(); }
 
-async function showEntry(entry) {
+const deck = new Deck({ hosts: [$('#ytHostA'), $('#ytHostB')], isDead, markDead, nextEntry });
+app.deck = deck;
+
+/** Show a live cam in the portal. entry = null → the pre-warmed next one (instant, never a dead cam). */
+async function showEntry(entry = null) {
   const my = ++app.loadToken;
-  app.portal.entry = entry; app.portal.status = null;
+  app.portal.status = null;
   fx.setLoading(true); ui.hideLabel(); sendState();
-  if (entry.offline || FORCE_OFFLINE || app.ytDown) {
-    player.stop(); view.showOffline(true);
+  if (FORCE_OFFLINE || app.ytDown || (entry && entry.offline)) {
+    deck.stopActive(); view.showOffline(true);
     await sleep(450);
     if (my === app.loadToken) finishLoad(OFFLINE_CAM, 'offline');
     return;
   }
   view.showOffline(false);
-  for (const src of sourcesOf(entry)) {
-    if (isDead(src.key)) continue;
-    try {
-      const info = await player.play(src);
-      if (my !== app.loadToken) return;
-      app.failStreak = 0;
-      finishLoad(entry, info && info.live === false ? 'recorded' : 'live');
-      return;
-    } catch (err) {
-      if (my !== app.loadToken || (err && err.code === 'cancel')) return;
-      if (err instanceof Error && /^yt-api/.test(err.message)) { app.ytDown = true; ui.toast(t('ytFail'), 4000); showEntry(OFFLINE_CAM); return; }
-      markDead(src.key, err && err.code);
-    }
+  try {
+    const r = await deck.present(entry);
+    if (my !== app.loadToken) return;
+    pushHistory(r.entry);
+    finishLoad(r.entry, r.live === false ? 'recorded' : 'live');
+  } catch (err) {
+    if (my !== app.loadToken || (err && err.code === 'cancel')) return;
+    if (err instanceof Error) { app.ytDown = true; ui.toast(t('ytFail'), 4000); } // YouTube API unreachable
+    else ui.toast(t('allDead'), 3500);                                               // nothing plays (internet?)
+    view.showOffline(true); finishLoad(OFFLINE_CAM, 'offline');
   }
-  if (my !== app.loadToken) return;
-  app.failStreak++;
-  const keep = app.pos; buildList(); app.pos = keep - 1;
-  if (app.failStreak >= CONFIG.MAX_FAIL_STREAK || app.list[0] === OFFLINE_CAM) { app.failStreak = 0; ui.toast(t('allDead'), 3500); showEntry(OFFLINE_CAM); return; }
-  ui.toast(t('camDead'), 1800);
-  showEntry(entryAt(1));
 }
 
 function finishLoad(entry, status) {
@@ -115,8 +118,7 @@ function openPortalAt(cx, cy, r, dir = 1, a0 = -Math.PI / 2, pick = 'next') {
   fx.openPortal(cx, cy, R, dir, a0, from);
   sfx.open(); buzz(60); placeLabel();
   app.events.push({ t: now(), e: 'open' }); window.__openedAt = performance.now();
-  buildList();
-  showEntry(pick === 'random' ? randomEntry() : entryAt(1));
+  showEntry(null);
 }
 
 function hop(step = 1, random = false) {
@@ -124,7 +126,7 @@ function hop(step = 1, random = false) {
   if (fx.portal.state === 'closing') return;
   fx.hop(); sfx.hop(); buzz(30);
   app.events.push({ t: now(), e: 'hop', step, random });
-  showEntry(random ? randomEntry() : entryAt(step));
+  showEntry(step < 0 && !random ? prevEntry() : null);
 }
 
 function closePortal() {
@@ -133,7 +135,7 @@ function closePortal() {
   fx.closePortal(); sfx.close(); buzz(40); ui.hideLabel();
   view.mode = 'portal'; fx.hidden = false;
   app.events.push({ t: now(), e: 'close' });
-  setTimeout(() => { if (!app.portal.open) { player.stop(); view.showOffline(false); } }, 520);
+  setTimeout(() => { if (!app.portal.open) { deck.stopActive(); view.showOffline(false); } }, 820);
   sendState();
 }
 
@@ -156,7 +158,7 @@ function toggleFull() { if (!app.portal.open) hop(0, true); else setFull(!app.po
 
 function placeLabel() { const p = app.portal; ui.placeLabel(p.cx, p.cy, p.R, view.mode === 'window' ? view.rect : null, p.full); }
 
-function toggleVideoSound() { app.videoMuted = !app.videoMuted; player.setMuted(app.videoMuted); ui.toast(app.videoMuted ? t('soundOff') : t('soundOn')); }
+function toggleVideoSound() { app.videoMuted = !app.videoMuted; deck.setMuted(app.videoMuted); ui.toast(app.videoMuted ? t('soundOff') : t('soundOn')); }
 function toggleSfx() { settings.sfx = !settings.sfx; saveSettings(); sfx.setEnabled(settings.sfx); ui.toast(settings.sfx ? t('sfxOn') : t('sfxOff')); }
 function cycleTheme() {
   settings.theme = THEME_KEYS[(THEME_KEYS.indexOf(settings.theme) + 1) % THEME_KEYS.length];
@@ -422,7 +424,7 @@ const ui = new UI({
         ui.setUserCams(userCams); ui.renderSettings(); buildList(); break;
       case 'clear-dead':
         for (const k of Object.keys(dead)) delete dead[k];
-        store.set('fw.dead', dead); app.ytDown = false; buildList(); ui.toast(t('cleared') + ' ✓'); break;
+        store.set('fw.dead', dead); app.ytDown = false; buildList(); deck.cancelStandby(); deck.prepare(200); ui.toast(t('cleared') + ' ✓'); break;
       default: break;
     }
   },
@@ -438,7 +440,8 @@ function settingChanged(key) {
     case 'preview':
       if (app.hand) app.hand.previewOn = settings.preview;
       $('#camPreview').classList.toggle('hidden', !(settings.preview && app.hand && app.hand.running && !FAKE_HAND)); break;
-    case 'cats': buildList(); app.pos = -1; break;
+    case 'cats': buildList(); deck.cancelStandby(); deck.prepare(200); break;
+    case 'ambient': view.ambientOn = settings.ambient; break;
     case 'size':
       if (!app.portal.open) break;
       if (settings.size === 'full') { setFull(true); break; }
@@ -453,7 +456,10 @@ function settingChanged(key) {
 }
 
 function start(mode) {
-  if (!app.started) { app.started = true; ui.hideStart(); sfx.init(); ensureWand(); }
+  if (!app.started) {
+    app.started = true; ui.hideStart(); sfx.init(); ensureWand();
+    if (!FORCE_OFFLINE) deck.prepare(200); // warm up the first live cam before any portal is drawn
+  }
   app.mode = mode;
   if (mode === 'hand') toggleHand(true);
   if (mode === 'phone') ui.openPanel('Phone');
@@ -482,9 +488,13 @@ function frame(nowMs) {
   const wantWin = settings.compliant && app.portal.open && (app.portal.status === 'live' || app.portal.status === 'recorded') && fx.portal.state === 'open';
   if (wantWin !== (view.mode === 'window')) {
     view.mode = wantWin ? 'window' : 'portal'; fx.hidden = wantWin;
-    view.frame(fx.portal.cx, fx.portal.cy, fx.portal.clipR, fx.portal.videoR); placeLabel();
+    app.relabel = true;
   }
-  view.frame(fx.portal.cx, fx.portal.cy, fx.portal.clipR, fx.portal.videoR);
+  const fp = fx.portal;
+  // ambient light fades in as the portal opens and while the stream is visible (not during the loading vortex)
+  const amb = 0.9 * clamp(fp.clipR / Math.max(1, 0.8 * app.portal.R), 0, 1) * (1 - 0.85 * fp.overlay);
+  view.frame(fp.cx, fp.cy, fp.clipR, fp.videoR, fp.zoom || 1, amb);
+  if (app.relabel) { app.relabel = false; placeLabel(); }
   if (app.portal.pendingFull && fx.portal.state === 'open') setFull(true); // "Full screen" size setting
   view.renderOffline(tSec, dt);
   fx.render();

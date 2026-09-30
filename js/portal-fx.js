@@ -45,7 +45,7 @@ export class FX {
     this.n = 0; this.carry = 0; this.vCarry = 0; this.ambCarry = 0;
     this.pointers = new Map();
     this.portal = {
-      state: 'closed', cx: 0, cy: 0, tcx: 0, tcy: 0, R: 0, curR: 0, renderR: 0, clipR: 0, videoR: 0,
+      state: 'closed', cx: 0, cy: 0, tcx: 0, tcy: 0, R: 0, curR: 0, renderR: 0, clipR: 0, videoR: 0, zoom: 1,
       dir: 1, t: 0, a0: 0, head: 0, traceK: 1, from: null, charge: 0, torn: false,
       overlay: 0, loading: false, flare: 0, flash: 0, dip: 0, shock: [], closeFrom: 0, closeDur: 0.55,
       full: false, home: null, fullK: 0,
@@ -207,10 +207,10 @@ export class FX {
         const k = clamp((p.t - T2) / (T3 - T2), 0, 1), e = easeOutCubic(k);
         p.cx = lerp(f.cx, p.tcx, e); p.cy = lerp(f.cy, p.tcy, e);
         p.curR = p.renderR = lerp(f.r, p.R, easeOutBack(k));
-        p.videoR = p.curR * (1 + 0.35 * (1 - e)); // view starts zoomed in and settles
+        p.videoR = p.curR; p.zoom = 1 + 0.35 * (1 - e); // view starts zoomed in and settles
         p.clipR = Math.max(0, p.renderR - edge);
         this._emitRing(dt, 2.2 - k, 1.2);
-        if (k >= 1) { p.state = 'open'; p.t = 0; }
+        if (k >= 1) { p.state = 'open'; p.t = 0; p.zoom = 1; }
       }
     } else if (p.state === 'open') {
       const k = Math.min(1, dt * 4.5);

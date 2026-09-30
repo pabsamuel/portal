@@ -42,7 +42,7 @@ const STR = {
     // settings
     settingsTitle: 'Ayarlar', theme: 'Tema', size: 'Portal boyutu',
     sizeGesture: 'Çizdiğin kadar', sizeLarge: 'Büyük', sizeHuge: 'Dev', sizeFull: 'Tam ekran',
-    categories: 'Nereler açılsın?', sfx: 'Efekt sesleri', preview: 'Kamera önizlemesi (el iskeleti)',
+    categories: 'Nereler açılsın?', sfx: 'Efekt sesleri', ambient: 'Ortam ışığı — portalın etrafını canlı görüntünün bulanık ışığıyla doldur (zayıf cihazda kapat)', preview: 'Kamera önizlemesi (el iskeleti)',
     sensitivity: 'El hassasiyeti', compliant: 'Uyumlu mod — video çerçevesiz ve üstünde efekt olmadan gösterilir (mağaza sürümü için)',
     language: 'Dil', addCam: 'Kendi canlı yayınını ekle', addCamUrl: 'YouTube linki', addCamName: 'İsim (ör. Sapanca Gölü)',
     add: 'Ekle', remove: 'Sil', clearDead: 'Kapalı kamera listesini sıfırla', sourcesPage: 'Kaynak kontrol sayfası →',
@@ -102,7 +102,7 @@ const STR = {
     code: 'Code', status: 'Status',
     settingsTitle: 'Settings', theme: 'Theme', size: 'Portal size',
     sizeGesture: 'As drawn', sizeLarge: 'Large', sizeHuge: 'Huge', sizeFull: 'Full screen',
-    categories: 'Which places?', sfx: 'Effect sounds', preview: 'Camera preview (hand skeleton)',
+    categories: 'Which places?', sfx: 'Effect sounds', ambient: 'Ambient light — fill the screen around the portal with a blurred glow of the live view (turn off on weak devices)', preview: 'Camera preview (hand skeleton)',
     sensitivity: 'Hand sensitivity', compliant: 'Compliant mode — video shown unframed with no effects over it (for store release)',
     language: 'Language', addCam: 'Add your own live stream', addCamUrl: 'YouTube link', addCamName: 'Name (e.g. Lake Sapanca)',
     add: 'Add', remove: 'Remove', clearDead: 'Reset offline-camera list', sourcesPage: 'Source checker page →',

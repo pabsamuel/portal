@@ -18,8 +18,13 @@
 
   <!-- live video layer (clipped to a circle) -->
   <div id="portalView" aria-hidden="true">
-    <div id="ytWrap"><div id="ytHost"></div><canvas id="offlineScene"></canvas></div>
+    <div id="ytWrap">
+      <div id="ytHosts"><div class="ythost" id="ytHostA"></div><div class="ythost" id="ytHostB"></div></div>
+      <canvas id="offlineScene"></canvas>
+    </div>
   </div>
+  <!-- ambient light: blurred copy of the live view around the portal -->
+  <div id="ambient"></div>
 
   <!-- sparks, trails, cursors -->
   <canvas id="fx"></canvas>

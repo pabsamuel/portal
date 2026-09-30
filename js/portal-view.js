@@ -7,8 +7,9 @@ import { TAU } from './gesture-core.js';
 const FIT = 1.15; // video height = FIT × portal diameter (the extra crops YouTube's own title/logo bars)
 
 export class PortalView {
-  constructor({ root, wrap, host, offline }) {
+  constructor({ root, wrap, host, offline, ambient }) {
     this.root = root; this.wrap = wrap; this.host = host; this.off = offline; this.offCtx = offline.getContext('2d');
+    this.amb = ambient; this.ambientOn = true; this.ambShown = false;
     this.mode = 'portal'; // 'portal' | 'window' (compliant mode: unmodified rectangle, nothing drawn over it)
     this.offlineOn = false; this.rect = null; this.lastT = '';
     this.stars = Array.from({ length: 260 }, () => ({ a: Math.random() * TAU, d: Math.random(), sp: 0.5 + Math.random() }));
@@ -32,19 +33,36 @@ export class PortalView {
    * scaleR = radius used to size the video (no wobble); when it grows past the screen the video
    * reaches scale 1 = full screen.
    */
-  frame(cx, cy, clipR, scaleR) {
+  frame(cx, cy, clipR, scaleR, zoom = 1, amb = 0) {
     if (this.mode === 'window') {
       const w = Math.min(this.W * 0.8, this.H * 0.72 * 16 / 9), h = w * 9 / 16;
       const x = (this.W - w) / 2, y = (this.H - h) / 2 - this.H * 0.04;
       this.rect = { x, y, w, h };
       this._transform(w / this.cw, x, y);
       this.setClip(clipR > 0.5 ? 1 : 0, 0, 0);
+      this._ambient(false);
       return;
     }
     this.rect = null;
-    const s = Math.min(1, (2 * Math.max(scaleR, 1) * FIT) / this.ch);
+    let s = Math.min(1, (2 * Math.max(scaleR, 1) * FIT) / this.ch);
+    // With ambient light the video must cover the whole screen around the portal as well.
+    if (this.ambientOn) s = Math.max(s, (2 * Math.max(cx, this.W - cx)) / this.cw, (2 * Math.max(cy, this.H - cy)) / this.ch);
+    s *= zoom;
     this._transform(s, cx - (this.cw * s) / 2, cy - (this.ch * s) / 2);
     this.setClip(clipR, cx, cy);
+    this._ambient(this.ambientOn && clipR > 0.5, cx, cy, clipR, amb);
+  }
+
+  /** Blurred, dimmed copy of the live view around the portal (backdrop-filter over the video layer). */
+  _ambient(on, cx, cy, r, a) {
+    const st = this.amb.style;
+    if (!on) { if (this.ambShown) { st.display = 'none'; this.ambShown = false; } return; }
+    if (!this.ambShown) { st.display = 'block'; this.ambShown = true; }
+    const m = `radial-gradient(circle ${r.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, transparent ${(r - 1).toFixed(1)}px, #000 ${(r + 1).toFixed(1)}px)`;
+    st.maskImage = m; st.webkitMaskImage = m;
+    st.background = `rgba(5,5,7,${(1 - a).toFixed(3)})`;
+    const f = a > 0.02 ? 'blur(26px) brightness(0.6) saturate(1.35)' : 'none';
+    if (st.backdropFilter !== f) { st.backdropFilter = f; st.webkitBackdropFilter = f; }
   }
 
   _transform(s, tx, ty) {
@@ -56,7 +74,7 @@ export class PortalView {
     const rs = this.root.style;
     if (r <= 0.5) { if (rs.visibility !== 'hidden') { rs.visibility = 'hidden'; rs.clipPath = 'circle(0px at 0px 0px)'; } return; }
     if (rs.visibility !== 'visible') rs.visibility = 'visible';
-    rs.clipPath = this.mode === 'window' ? 'none' : `circle(${r.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px)`;
+    rs.clipPath = this.mode === 'window' || this.ambientOn ? 'none' : `circle(${r.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px)`;
   }
 
   showOffline(on) {

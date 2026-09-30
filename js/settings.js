@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   preview: true,         // small camera preview with hand skeleton
   sens: 1.0,             // hand-tracking reach (higher = smaller hand motion covers the screen)
   compliant: false,      // store-release mode: unmodified rectangular player, no effects over it
+  ambient: true,         // blurred copy of the live view fills the screen around the portal
 };
 
 export const store = {

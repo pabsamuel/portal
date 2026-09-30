@@ -75,6 +75,7 @@ export class UI {
         <div class="row"><span class="lbl">${esc(t('size'))}</span>${seg('size', ['gesture', 'large', 'huge', 'full'], (v) => t({ gesture: 'sizeGesture', large: 'sizeLarge', huge: 'sizeHuge', full: 'sizeFull' }[v]))}</div>
         <div class="row col"><span class="lbl">${esc(t('categories'))}</span><div class="chips">${ALL_CATS.map((c) => `<label class="chipbox"><input type="checkbox" data-cat="${c}" ${settings.cats.includes(c) ? 'checked' : ''}>${esc(catsL[c] || c)}</label>`).join('')}</div></div>
         <div class="row"><label class="tog"><input type="checkbox" data-set="sfx" ${settings.sfx ? 'checked' : ''}> ${esc(t('sfx'))}</label></div>
+        <div class="row"><label class="tog"><input type="checkbox" data-set="ambient" ${settings.ambient ? 'checked' : ''}> ${esc(t('ambient'))}</label></div>
         <div class="row"><label class="tog"><input type="checkbox" data-set="preview" ${settings.preview ? 'checked' : ''}> ${esc(t('preview'))}</label></div>
         <div class="row"><span class="lbl">${esc(t('sensitivity'))}</span><input type="range" min="0.6" max="1.8" step="0.05" data-set="sens" value="${settings.sens}"><span class="val">${Number(settings.sens).toFixed(2)}×</span></div>
         <div class="row"><label class="tog"><input type="checkbox" data-set="compliant" ${settings.compliant ? 'checked' : ''}> ${esc(t('compliant'))}</label></div>
