@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#050507">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Portal Asası</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/wand.css">
+  <script src="vendor/peerjs.min.js" defer></script>
+  <script type="module" src="js/wand.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">✦ <span data-t="title">Portal Asası</span></div>
+    <div id="status" class="status off"><i></i><span>—</span></div>
+  </header>
+
+  <section id="setup" class="card">
+    <h1 data-t="hello">Telefonun artık bir asa</h1>
+    <p data-t="intro">Ekrandaki kod otomatik geldi. Başlamak için dokun.</p>
+    <label class="codebox"><span data-t="code">Kod</span><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"></label>
+    <button id="go" class="primary" data-t="activate">Asayı etkinleştir</button>
+    <p id="setupMsg" class="msg"></p>
+  </section>
+
+  <main id="wand" class="hidden">
+    <div id="now" class="now">—</div>
+    <button id="pad" class="pad" aria-label="cast">
+      <span class="pad-ring"></span>
+      <span class="pad-text" data-t="hold">BASILI TUT<br>HAVADA DAİRE ÇİZ</span>
+    </button>
+    <div class="grid">
+      <button data-b="prev">◀<small data-t="prev">Önceki</small></button>
+      <button data-b="random">🎲<small data-t="random">Rastgele</small></button>
+      <button data-b="next">▶<small data-t="next">Sonraki</small></button>
+      <button data-b="close">✕<small data-t="closeP">Kapat</small></button>
+      <button id="recenter">⊙<small data-t="center">Ortala</small></button>
+      <button data-b="mute">🔊<small data-t="sound">Ses</small></button>
+    </div>
+    <details class="opts">
+      <summary data-t="settings">Ayarlar</summary>
+      <label><span data-t="speed">İmleç hızı</span><input id="gain" type="range" min="0.4" max="2.5" step="0.05" value="1"></label>
+      <label class="row"><input id="invx" type="checkbox"> <span data-t="invert">Sağ-sol ters</span></label>
+      <label class="row"><input id="free" type="checkbox"> <span data-t="free">Basılı tutmadan çiz (serbest mod)</span></label>
+      <p class="msg" data-t="tip">İpucu: Telefonu uzaktan kumanda gibi tut, bileğinle geniş ve rahat bir daire çiz. Parmağını ortadaki dairede kaydırarak da çizebilirsin.</p>
+    </details>
+    <p id="sensorMsg" class="msg"></p>
+  </main>
+</body>
+</html>

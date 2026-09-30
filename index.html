@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#050507">
+  <meta name="description" content="Draw a circle in the air — a sparking portal opens onto live cameras around the world.">
+  <title>Farwindow Portal</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="vendor/peerjs.min.js" defer></script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div id="bg"></div>
+
+  <!-- live video layer (clipped to a circle) -->
+  <div id="portalView" aria-hidden="true">
+    <div id="ytWrap"><div id="ytHost"></div></div>
+    <canvas id="offlineScene"></canvas>
+  </div>
+
+  <!-- sparks, trails, cursors -->
+  <canvas id="fx"></canvas>
+
+  <div id="label" class="hidden" aria-live="polite"></div>
+  <div id="hint" class="hidden"></div>
+  <div id="toast" class="hidden" role="status"></div>
+
+  <video id="cam" playsinline muted></video>
+  <canvas id="camPreview" class="hidden" width="240" height="180"></canvas>
+
+  <nav id="hud">
+    <div class="hud-status">
+      <span id="stHand" class="chip off"><i></i><b data-i18n="hand">El</b><em>—</em></span>
+      <span id="stWand" class="chip off"><i></i><b data-i18n="phone">Telefon</b><em>—</em></span>
+    </div>
+    <div class="hud-btns">
+      <button data-act="hand" title="C">✋</button>
+      <button data-act="phone" title="P">📱</button>
+      <button data-act="settings" title="O">⚙️</button>
+      <button data-act="help" title="H">❔</button>
+      <button data-act="fullscreen" title="F">⛶</button>
+    </div>
+  </nav>
+
+  <section id="start" class="overlay">
+    <div class="start-inner">
+      <div class="ring-logo" aria-hidden="true"></div>
+      <h1 class="logo">PORTAL</h1>
+      <p class="tag" data-i18n="tagline"></p>
+      <div class="start-btns">
+        <button class="big" data-act="start-hand">✋ <span data-i18n="startHand"></span></button>
+        <button class="big" data-act="start-phone">📱 <span data-i18n="startPhone"></span></button>
+        <button class="big ghost" data-act="start-mouse">🖱️ <span data-i18n="startMouse"></span></button>
+      </div>
+      <p class="fine" data-i18n="startFine"></p>
+    </div>
+  </section>
+
+  <section id="panelPhone" class="panel hidden"></section>
+  <section id="panelSettings" class="panel hidden"></section>
+  <section id="panelHelp" class="panel hidden"></section>
+
+  <noscript>JavaScript gerekli / JavaScript required.</noscript>
+</body>
+</html>

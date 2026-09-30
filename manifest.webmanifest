@@ -1,0 +1,12 @@
+{
+  "name": "Farwindow Portal",
+  "short_name": "Portal",
+  "description": "Draw a circle in the air — a sparking portal opens onto live cameras around the world.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050507",
+  "theme_color": "#050507",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
