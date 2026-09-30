@@ -50,6 +50,8 @@ const STR = {
     videoAdded: 'Video eklendi', videoBad: 'Bu video bu tarayıcıda oynatılamadı (MP4 H.264 ya da WebM dene).', videoBadUrl: 'Geçerli bir video linki değil (https://… ile başlamalı).',
     videoNone: 'Video dosyası bulunamadı (MP4, WebM, MOV).', storageFull: 'Video eklendi ama tarayıcı hafızası dolu: sadece bu oturumda kalacak.', dropHere: '🎬 Videoyu bırak — portalda açılsın',
     localFile: 'dosya', linkFile: 'link', play: 'Aç', recOff: 'Çekim modu kapandı (R)',
+    missPartial: 'Neredeyse! Daireyi tam kapat ↻', missSmall: 'Daire çok küçük — daha geniş çiz', missFlat: 'Daire çok yassı — daha yuvarlak çiz', missWobbly: 'Daire titrek — biraz daha yavaş ve düzgün çiz',
+    missWandTip: 'telefonu lazer gibi ekrana doğrult, bileğinle ucunu çevir',
     add: 'Ekle', remove: 'Sil', clearDead: 'Kapalı kamera listesini sıfırla', sourcesPage: 'Kaynak kontrol sayfası →',
     close: 'Kapat', added: 'Eklendi', badUrl: 'Geçerli bir YouTube linki değil', cleared: 'Sıfırlandı',
     // help
@@ -115,6 +117,8 @@ const STR = {
     videoAdded: 'Video added', videoBad: 'This video can’t play in this browser (try MP4 H.264 or WebM).', videoBadUrl: 'Not a valid video link (must start with https://…).',
     videoNone: 'No video file found (MP4, WebM, MOV).', storageFull: 'Video added, but browser storage is full: it will only last for this session.', dropHere: '🎬 Drop the video — it opens in the portal',
     localFile: 'file', linkFile: 'link', play: 'Open', recOff: 'Recording mode off (R)',
+    missPartial: 'Almost! Close the circle ↻', missSmall: 'Circle too small — draw it wider', missFlat: 'Circle too flat — make it rounder', missWobbly: 'Circle too shaky — a bit slower and smoother',
+    missWandTip: 'point the phone at the screen like a laser and turn its tip with your wrist',
     add: 'Add', remove: 'Remove', clearDead: 'Reset offline-camera list', sourcesPage: 'Source checker page →',
     close: 'Close', added: 'Added', badUrl: 'Not a valid YouTube link', cleared: 'Reset',
     helpTitle: 'Gestures and shortcuts',

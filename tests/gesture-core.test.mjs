@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CircleDetector, SwipeDetector, HoldDetector, ShakeDetector, OneEuro, airMouseDelta, TAU,
+  CircleDetector, SwipeDetector, HoldDetector, ShakeDetector, OneEuro, airMouseDelta, TAU, evalStroke,
 } from '../js/gesture-core.js';
 
 // Deterministic pseudo-random for reproducible noise.
@@ -174,4 +174,36 @@ test('air mouse: phone upright (camera grip) — same directions, roll ignored',
 test('air mouse: deadzone removes gyro drift', () => {
   const d = airMouseDelta({ alpha: 0.8, beta: -1.0, gamma: 0.5 }, [0, 0, 1], 0.1, 0.012);
   assert.equal(d.dx, 0); assert.equal(d.dy, 0);
+});
+
+// ---- whole-stroke check (pen-gated inputs: mouse button / phone pad held)
+test('stroke: a 280° loop counts when the pen is lifted (live detector needs 306°)', () => {
+  const pts = circlePts({ r: 0.2, dur: 1.0, turns: 0.78 });
+  assert.equal(feed(new CircleDetector(), pts), null);
+  const r = evalStroke(pts);
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.ok(Math.abs(r.r - 0.2) < 0.05);
+});
+test('stroke: flattened ellipse (phone axes with unequal gain) still counts', () => {
+  assert.ok(evalStroke(circlePts({ r: 0.25, squash: 0.4, dur: 1.2, turns: 1.0 })).ok);
+});
+test('stroke: circle clipped against a screen edge still counts', () => {
+  const pts = circlePts({ cx: 0.3, r: 0.25, dur: 1.2, turns: 1.05 }).map((p) => ({ ...p, x: Math.max(p.x, 0.12) }));
+  assert.ok(evalStroke(pts).ok);
+});
+test('stroke: wobbly hand-held circle counts', () => {
+  assert.ok(evalStroke(circlePts({ r: 0.15, dur: 1.5, turns: 1.0, noise: 0.07 })).ok);
+});
+test('stroke: approach line followed by a loop counts', () => {
+  const line = linePts({ x0: 0.2, y0: 0.9, x1: 0.7, y1: 0.5, dur: 0.3 });
+  const loop = circlePts({ cx: 0.9, cy: 0.5, r: 0.2, dur: 1.0, turns: 1.0, a0: Math.PI, t0: 0.31 });
+  assert.ok(evalStroke([...line, ...loop]).ok);
+});
+test('stroke: straight line, half circle and tiny jitter are rejected with a reason', () => {
+  const line = evalStroke(linePts({ x0: 0.2, y0: 0.5, x1: 1.0, y1: 0.52, dur: 0.6 }));
+  assert.equal(line.ok, false);
+  const half = evalStroke(circlePts({ r: 0.2, dur: 0.8, turns: 0.5 }));
+  assert.equal(half.ok, false); assert.equal(half.why, 'partial');
+  const tiny = evalStroke(circlePts({ r: 0.01, dur: 0.8, turns: 1.0 }));
+  assert.equal(tiny.ok, false); assert.equal(tiny.why, 'small');
 });

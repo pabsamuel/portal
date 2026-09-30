@@ -1,6 +1,6 @@
 // main.js — app orchestration: inputs → gesture detectors → portal (effects + live cam).
 import { CONFIG } from './config.js';
-import { CircleDetector, SwipeDetector, HoldDetector, OneEuro, clamp } from './gesture-core.js';
+import { CircleDetector, SwipeDetector, HoldDetector, OneEuro, clamp, evalStroke } from './gesture-core.js';
 import { FX, THEME_KEYS } from './portal-fx.js';
 import { PortalView } from './portal-view.js';
 import { Deck } from './deck.js';
@@ -133,11 +133,14 @@ function openPortalAt(cx, cy, r, dir = 1, a0 = -Math.PI / 2, entry = null) {
   const { W, H, minDim } = app;
   const from = { cx, cy, r }; // the circle as drawn — the portal ignites exactly there
   let R;
-  if (settings.size === 'large' || settings.size === 'full') { R = 0.49 * minDim; cx = W / 2; cy = H / 2; }
-  else if (settings.size === 'huge') { R = 0.62 * minDim; cx = W / 2; cy = H / 2; }
-  else R = clamp(r * 1.3, 0.36 * minDim, 0.49 * minDim);
-  cx = W > 2 * R + 20 ? clamp(cx, R + 10, W - R - 10) : W / 2;
-  cy = H > 2 * R + 20 ? clamp(cy, R + 8, H - R - 8) : H / 2;
+  if (settings.size === 'huge') R = 0.62 * minDim;
+  else if (settings.size === 'large' || settings.size === 'full') R = 0.49 * minDim;
+  else R = clamp(r * 1.25, 0.26 * minDim, 0.49 * minDim);
+  // The portal opens where it was drawn (Samet: "wherever I hold / gesture"). It may hang over an
+  // edge a little; it is only nudged so that at least ~70% of its radius stays on screen.
+  const m = 0.7 * R;
+  cx = W > 2 * m ? clamp(cx, m, W - m) : W / 2;
+  cy = H > 2 * m ? clamp(cy, m, H - m) : H / 2;
   Object.assign(app.portal, { open: true, full: false, pendingFull: settings.size === 'full', cx, cy, R });
   view.mode = 'portal'; fx.hidden = false;
   fx.openPortal(cx, cy, R, dir, a0, from);
@@ -198,33 +201,56 @@ function toggleFullscreen() {
 }
 
 // ---------------------------------------------------------------- unified input → gestures
+// Phone strokes are gyro-derived: noisier, often flattened (unequal axis gain) and slower than a mouse.
+const WAND_CIRCLE = { roundMax: 0.42, angleFrac: 0.8, aspectMin: 0.4, tMax: 3.0, rMin: 0.035 };
 function feed(id, x, y, drawing, tSec, kind) {
   let inp = app.inputs.get(id);
-  if (!inp) { inp = { circle: new CircleDetector(), swipe: new SwipeDetector(), kind, wasDrawing: false }; app.inputs.set(id, inp); }
+  if (!inp) {
+    inp = { circle: new CircleDetector(kind === 'wand' ? WAND_CIRCLE : {}), swipe: new SwipeDetector(), kind, wasDrawing: false, stroke: [], used: false };
+    app.inputs.set(id, inp);
+  }
   inp.x = x; inp.y = y; inp.lastT = tSec; inp.kind = kind;
   if (!drawing) {
     fx.setPointer(id, x, y, false, kind, tSec, 0);
-    if (inp.wasDrawing) { inp.circle.reset(); inp.swipe.reset(); }
+    if (inp.wasDrawing) { endStroke(id, inp); inp.circle.reset(); inp.swipe.reset(); }
     inp.wasDrawing = false; return;
   }
+  if (!inp.wasDrawing) { inp.stroke.length = 0; inp.used = false; } // pen down: a new stroke starts
   inp.wasDrawing = true; app.lastActivity = tSec;
   const ux = x / app.minDim, uy = y / app.minDim;
+  if (kind !== 'hand' && inp.stroke.length < 900) inp.stroke.push({ x: ux, y: uy, t: tSec });
   const c = inp.circle.push(ux, uy, tSec);
   fx.setPointer(id, x, y, true, kind, tSec, c ? 1 : inp.circle.progress());
-  if (c) {
-    inp.swipe.reset(); fx.clearTrail(id);
-    app.events.push({ t: tSec, e: 'circle', id, r: c.r, dir: c.dir });
-    if (!app.portal.open) openPortalAt(c.cx * app.minDim, c.cy * app.minDim, c.r * app.minDim, c.dir, c.startAngle);
-    else hop(1, true);
-    return;
-  }
+  if (c) { onCircle(id, inp, c, tSec); return; }
   const s = inp.swipe.push(ux, uy, tSec);
   if (s && app.portal.open && fx.portal.state === 'open') {
-    inp.circle.reset(); fx.clearTrail(id);
+    inp.used = true; inp.circle.reset(); fx.clearTrail(id);
     app.events.push({ t: tSec, e: 'swipe', id, axis: s.axis, dir: s.dir });
     if (s.axis === 'x') hop(s.dir);
     else setFull(s.dir < 0); // flick up = step into full screen, flick down = back to the portal
   }
+}
+function onCircle(id, inp, c, tSec, via = 'live') {
+  inp.used = true; inp.swipe.reset(); fx.clearTrail(id);
+  app.events.push({ t: tSec, e: 'circle', id, r: c.r, dir: c.dir, via });
+  if (!app.portal.open) openPortalAt(c.cx * app.minDim, c.cy * app.minDim, c.r * app.minDim, c.dir, c.startAngle);
+  else hop(1, true);
+}
+/** Pen lifted (mouse button / phone pad released): judge the whole stroke leniently — the user marked it. */
+function endStroke(id, inp) {
+  if (inp.kind === 'hand' || inp.used || inp.stroke.length < 8) return;
+  const r = evalStroke(inp.stroke);
+  app.lastStroke = { kind: inp.kind, ...r };
+  if (r.ok) { onCircle(id, inp, r, now(), 'stroke'); return; }
+  if (r.stats && r.stats.turns >= 0.45) strokeHint(r.why, inp.kind); // clearly tried a circle → say why it didn't count
+}
+let hintAt = -Infinity;
+function strokeHint(why, kind) {
+  const n = now(); if (n - hintAt < 2.5) return; hintAt = n;
+  const msg = t({ partial: 'missPartial', small: 'missSmall', flat: 'missFlat', wobbly: 'missWobbly' }[why] || 'missPartial');
+  ui.toast(kind === 'wand' ? `${msg} · ${t('missWandTip')}` : msg, 3500);
+  if (kind === 'wand' && app.wand) app.wand.broadcast({ t: 'hint', text: msg });
+  app.events.push({ t: n, e: 'miss', why });
 }
 function removeInput(id) { fx.removePointer(id); app.inputs.delete(id); }
 
@@ -309,6 +335,7 @@ function renderDebug() {
     `list ${app.list.length}  pos ${app.pos}  dead ${deadN}  own ${ownVideos.length}`,
     `hand ${app.hand && app.hand.running ? Math.round(app.hand.fps) + ' fps' : 'off'}  wand ${app.wandStatus.state}${app.wand && app.wand.code ? ' ' + app.wand.code : ''} (${app.wands.size})`,
     `inputs ${inputs}`,
+    `last stroke ${app.lastStroke ? `${app.lastStroke.kind} ${app.lastStroke.ok ? 'OK' : '✕ ' + app.lastStroke.why}${app.lastStroke.stats || app.lastStroke.ok ? ` turns ${(app.lastStroke.ok ? app.lastStroke : app.lastStroke.stats).turns.toFixed(2)} r ${(app.lastStroke.ok ? app.lastStroke : app.lastStroke.stats).r.toFixed(3)} round ${(app.lastStroke.ok ? app.lastStroke : app.lastStroke.stats).round.toFixed(2)} asp ${(app.lastStroke.ok ? app.lastStroke : app.lastStroke.stats).aspect.toFixed(2)}` : ''}` : '—'}`,
     `tab ${document.visibilityState}  ${app.W}×${app.H}  ${OBS ? 'OBS ' : ''}${document.body.classList.contains('rec') ? 'REC' : ''}`,
   ].join('\n');
 }
@@ -586,10 +613,7 @@ function settingChanged(key) {
       if (!app.portal.open) break;
       if (settings.size === 'full') { setFull(true); break; }
       if (app.portal.full) setFull(false);
-      if (settings.size !== 'gesture') {
-        const p = app.portal; p.cx = app.W / 2; p.cy = app.H / 2;
-        setPortalRadius((settings.size === 'huge' ? 0.62 : 0.49) * app.minDim);
-      }
+      if (settings.size !== 'gesture') setPortalRadius((settings.size === 'huge' ? 0.62 : 0.49) * app.minDim); // stays where it is
       break;
     default: break;
   }
@@ -673,6 +697,6 @@ Object.assign(app, {
     close: closePortal, hop, feed, toggleHand, start, onWandEvent, onWandMotion, setPortalRadius, setFull,
     addFiles, addVideoUrl, removeVideo, goTo, jumpTo, toggleRec, toggleDebug, own: () => ownVideos.map((e) => e.key),
     wandCode: () => app.wand && app.wand.code,
-    state: () => ({ open: app.portal.open, full: app.portal.full, fxState: fx.portal.state, status: app.portal.status, entry: app.portal.entry && app.portal.entry.key, particles: fx.n, R: app.portal.R, fxR: Math.round(fx.portal.curR), mode: view.mode }),
+    state: () => ({ cx: Math.round(app.portal.cx), cy: Math.round(app.portal.cy), open: app.portal.open, full: app.portal.full, fxState: fx.portal.state, status: app.portal.status, entry: app.portal.entry && app.portal.entry.key, particles: fx.n, R: app.portal.R, fxR: Math.round(fx.portal.curR), mode: view.mode }),
   },
 });

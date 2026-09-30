@@ -50,11 +50,12 @@ try {
     await page.click('[data-act="start-mouse"]');
     await sleep(3000);
     await page.screenshot({ path: join(OUT, '02-idle-hint.png') });
-    await drawCircle(page, 900, 450, 170);
+    await drawCircle(page, 520, 330, 170);
     await sleep(250);
     await page.screenshot({ path: join(OUT, '03-opening.png') });
     let s = await state(page);
     check('mouse circle opens a portal', s.open === true, JSON.stringify(s));
+    check('portal opens where the circle was drawn (not centered)', Math.abs(s.cx - 520) < 40 && Math.abs(s.cy - 330) < 40, `${s.cx},${s.cy}`);
     await sleep(2200);
     s = await state(page);
     check('portal reaches open state with offline scene', s.fxState === 'open' && s.status === 'offline', JSON.stringify(s));
@@ -286,6 +287,32 @@ try {
     const corner = await page.evaluate(() => getComputedStyle(document.querySelector('#ambient')).display);
     check('OBS mode has no ambient fill around the portal', corner === 'none', corner);
     check('no JS errors (OBS mode)', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // 11) Phone wand: an imperfect circle (flattened, 290°, slow) counts when the pad is released;
+  //     a half circle gives a "why not" hint instead of silence
+  {
+    const { page, errors } = await newPage('index.html?offline=1&auto=mouse');
+    const stroke = (turns, squash, dur) => page.evaluate(async ([turns, squash, dur]) => {
+      const api = window.__portal.api; api.onWandEvent('p2', { t: 'hello' });
+      const steps = Math.round(dur * 60); let px = 0, py = 0;
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2 * turns, x = 0.22 * Math.cos(a) + 0.01 * Math.sin(i * 1.7), y = 0.22 * squash * Math.sin(a);
+        api.onWandMotion('p2', i ? x - px : 0, i ? y - py : 0, true); px = x; py = y;
+        await new Promise((r) => setTimeout(r, 16));
+      }
+      api.onWandMotion('p2', 0, 0, false);
+    }, [turns, squash, dur]);
+    await stroke(0.5, 1, 0.8); await sleep(300);
+    let evs = await page.evaluate(() => window.__portal.events.map((e) => e.e + (e.why ? ':' + e.why : '')));
+    let s = await state(page);
+    check('wand half circle does not open, explains why', s.open === false && evs.includes('miss:partial'), evs.join(','));
+    await sleep(2600);
+    await stroke(0.8, 0.5, 2.6); await sleep(1500);
+    evs = await page.evaluate(() => window.__portal.events.map((e) => e.e + (e.via ? ':' + e.via : '')));
+    s = await state(page);
+    check('wand imperfect circle opens the portal (live or on release)', s.open === true && evs.some((e) => e.startsWith('circle')), evs.join(','));
+    check('no JS errors (wand strokes)', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 } finally {

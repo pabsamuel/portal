@@ -23,7 +23,7 @@ const EN_UI = {
   title: 'Portal Wand', hello: 'Your phone is now a wand', intro: 'The code from the screen is filled in. Tap to start.', code: 'Code',
   activate: 'Activate wand', hold: 'HOLD &amp; DRAW<br>A CIRCLE IN THE AIR', prev: 'Previous', random: 'Random', next: 'Next', closeP: 'Close',
   center: 'Center', sound: 'Sound', fullP: 'Full', themeP: 'Theme', settings: 'Settings', speed: 'Cursor speed', invert: 'Invert left/right', free: 'Draw without holding (free mode)',
-  tip: 'Tip: hold the phone like a remote and draw a wide, relaxed circle with your wrist. While a portal is open, hold and flick the phone up for full screen, down to go back. You can also drag your finger around the circle.',
+  tip: 'Tip: point the phone at the screen like a laser pointer. Turn its <b>tip</b> in a wide circle with your wrist — moving your arm without turning the phone does not move the cursor. The shape is judged when you lift your finger. While a portal is open, hold and flick the phone up for full screen, down to go back. You can also drag your finger around the circle.',
 };
 if (!TR) { document.documentElement.lang = 'en'; document.querySelectorAll('[data-t]').forEach((el) => { if (EN_UI[el.dataset.t]) el.innerHTML = EN_UI[el.dataset.t]; }); }
 
@@ -94,7 +94,11 @@ function openConn() {
   conn.on('data', (msg) => {
     if (typeof msg === 'string') { try { msg = JSON.parse(msg); } catch { return; } }
     if (!msg) return;
-    if (msg.t === 'state') $('#now').textContent = msg.open ? `🌀 ${msg.name || '…'}` : S.closed;
+    if (msg.t === 'state') { st.nowText = msg.open ? `🌀 ${msg.name || '…'}` : S.closed; if (!st.hintUntil || Date.now() > st.hintUntil) $('#now').textContent = st.nowText; }
+    else if (msg.t === 'hint') { // the screen explains why a circle didn't count
+      $('#now').textContent = '↻ ' + String(msg.text || '').slice(0, 80); st.hintUntil = Date.now() + 3000; vibrate(20);
+      setTimeout(() => { if (Date.now() >= st.hintUntil && st.nowText) $('#now').textContent = st.nowText; }, 3100);
+    }
     else if (msg.t === 'buzz') vibrate(Math.min(200, msg.ms || 30));
   });
   conn.on('close', () => { if (st.conn !== conn) return; st.connected = false; status('warn', S.lost); retry(2000); });

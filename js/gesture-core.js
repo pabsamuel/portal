@@ -65,6 +65,65 @@ export function evalCircle(pts, s, e, o = DEFAULTS.circle) {
   return { cx, cy, r: meanR, dir: Math.sign(sum), startAngle: a0, turns: Math.abs(sum) / TAU };
 }
 
+/**
+ * Shape statistics of pts[s..e] around their bounding-box center (no thresholds).
+ * minStep (fraction of the estimated radius) makes the angle sums ignore sample-to-sample jitter:
+ * only points at least that far from the last counted point add to the turn.
+ */
+export function circleStats(pts, s = 0, e = pts.length - 1, minStep = 0) {
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  for (let i = s; i <= e; i++) {
+    const p = pts[i];
+    if (p.x < minx) minx = p.x; if (p.x > maxx) maxx = p.x;
+    if (p.y < miny) miny = p.y; if (p.y > maxy) maxy = p.y;
+  }
+  const bw = maxx - minx, bh = maxy - miny, cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
+  const step = minStep * (bw + bh) / 4;
+  let sumR = 0, sumR2 = 0, sum = 0, sumAbs = 0, prevA = null, a0 = 0, lx = 0, ly = 0;
+  const m = e - s + 1;
+  for (let i = s; i <= e; i++) {
+    const px = pts[i].x, py = pts[i].y, dx = px - cx, dy = py - cy, r = Math.hypot(dx, dy);
+    sumR += r; sumR2 += r * r;
+    if (prevA !== null && i !== e && Math.hypot(px - lx, py - ly) < step) continue;
+    const a = Math.atan2(dy, dx);
+    if (prevA === null) a0 = a; else { const d = wrapAngle(a - prevA); sum += d; sumAbs += Math.abs(d); }
+    prevA = a; lx = px; ly = py;
+  }
+  const r = sumR / m, std = Math.sqrt(Math.max(0, sumR2 / m - r * r));
+  return {
+    cx, cy, r, dir: Math.sign(sum) || 1, startAngle: a0,
+    turns: Math.abs(sum) / TAU, round: r > 0 ? std / r : 1, coherence: sumAbs ? Math.abs(sum) / sumAbs : 0,
+    aspect: bh > 0 && bw > 0 ? Math.min(bw / bh, bh / bw) : 0, size: Math.min(bw, bh),
+  };
+}
+
+/**
+ * Lenient whole-stroke circle check for pen-gated inputs (mouse button held, phone pad held).
+ * The user marked where the stroke starts and ends, so wobbly, flattened or slightly open circles
+ * still count. Returns {ok:true, cx, cy, r, dir, startAngle, turns} or {ok:false, why, stats}.
+ * why: 'short' | 'small' | 'partial' | 'flat' | 'wobbly'
+ */
+export const STROKE_DEFAULTS = { tMin: 0.25, tMax: 6, rMin: 0.03, rMax: 0.9, roundMax: 0.5, angleFrac: 0.7, coherenceMin: 0.65, aspectMin: 0.3, minPts: 8 };
+export function evalStroke(pts, o = STROKE_DEFAULTS) {
+  let s0 = 0;
+  const n = pts.length;
+  if (n < o.minPts) return { ok: false, why: 'short', stats: null };
+  while (s0 < n - 1 && pts[n - 1].t - pts[s0].t > o.tMax) s0++;
+  if (pts[n - 1].t - pts[s0].t < o.tMin || n - s0 < o.minPts) return { ok: false, why: 'short', stats: null };
+  let best = null;
+  // also try without the first 10–30 % ("approach" before the loop starts)
+  for (const f of [0, 0.1, 0.2, 0.3]) {
+    const s = s0 + Math.floor((n - s0) * f);
+    if (n - s < o.minPts) break;
+    const st = circleStats(pts, s, n - 1, 0.25);
+    const ok = st.r >= o.rMin && st.r <= o.rMax && st.aspect >= o.aspectMin && st.turns >= o.angleFrac && st.round <= o.roundMax && st.coherence >= o.coherenceMin;
+    if (ok) return { ok: true, ...st };
+    if (!best || st.turns > best.turns) best = st;
+  }
+  const why = best.r < o.rMin ? 'small' : best.turns < o.angleFrac ? 'partial' : best.aspect < o.aspectMin ? 'flat' : 'wobbly';
+  return { ok: false, why, stats: best };
+}
+
 /** Detects a (roughly) circular stroke in a stream of points. */
 export class CircleDetector {
   constructor(opts = {}) {
